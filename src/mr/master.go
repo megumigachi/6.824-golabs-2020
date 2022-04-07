@@ -21,7 +21,8 @@ type Master struct {
 }
 
 //心跳时间，但并不没有采取心跳连接，而是单个task能有的最多时间
-const tolerance time.Duration = 10*time.Second
+const tolerance time.Duration = 10 * time.Second
+
 //互斥锁
 var mu sync.Mutex
 
@@ -40,42 +41,43 @@ func (m *Master) RequestTask(args *TaskRequestArgs, reply *TaskRequestReply) err
 	mu.Lock()
 	defer mu.Unlock()
 	var find bool
-	//all finished
+	//all finished发
 	if m.reduceDone {
-		reply.ok=false
-		reply.reason=finished
+		reply.ok = false
+		reply.reason = finished
 		return nil
 	}
 	if !m.mapDone {
 		for _, mapTask := range m.mapTasks {
-			if mapTask.State==Doing && time.Now().Sub(mapTask.StartTime)>tolerance {
-				mapTask.State=Todo
+			if mapTask.State == Doing && time.Now().Sub(mapTask.StartTime) > tolerance {
+				mapTask.State = Todo
 			}
-			if mapTask.State==Todo{
-				reply.ok=true
-				reply.task=mapTask
-				find=true
+			if mapTask.State == Todo {
+				mapTask.StartTime = time.Now()
+				reply.ok = true
+				reply.task = mapTask
+				find = true
 			}
 		}
-	}else {
+	} else {
 		for _, reduceTask := range m.reduceTasks {
-			if reduceTask.State==Doing && time.Now().Sub(reduceTask.StartTime)>tolerance {
-				reduceTask.State=Todo
+			if reduceTask.State == Doing && time.Now().Sub(reduceTask.StartTime) > tolerance {
+				reduceTask.State = Todo
 			}
-			if reduceTask.State==Todo{
-				reply.ok=true
-				reply.task=reduceTask
-				find=true
+			if reduceTask.State == Todo {
+				reduceTask.StartTime = time.Now()
+				reply.ok = true
+				reply.task = reduceTask
+				find = true
 			}
 		}
 	}
 	if !find {
-		reply.ok=false
-		reply.reason=wait
+		reply.ok = false
+		reply.reason = wait
 	}
 	return nil
 }
-
 
 //
 // start a thread that listens for RPCs from worker.go
