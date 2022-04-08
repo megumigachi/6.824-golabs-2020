@@ -2,7 +2,9 @@ package mr
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"time"
 )
 import "log"
 import "net/rpc"
@@ -33,6 +35,7 @@ type worker struct {
 
 var wk *worker
 
+
 //
 // main/mrworker.go calls this function.
 //
@@ -43,15 +46,26 @@ func Worker(mapf func(string, string) []KeyValue,
 	wk.mapf = mapf;
 	wk.reducef = reducef;
 	for {
+		//require tasks
 		ta:=&TaskRequestArgs{}
 		tp:=&TaskRequestReply{}
 		ok:=call("Master.RequestTask",ta,tp)
 		if !ok {
+			//master error?
 			DPrint("error while requesting")
 			os.Exit(1)
 		}
 		if !tp.ok {
-
+			if tp.reason==finished {
+				DPrint("Worker exit: all task finished")
+				os.Exit(0)
+			}else if tp.reason==wait {
+				DPrint("Worker: no task available now, waiting")
+				time.Sleep(1*time.Second)
+			}
+		}else {
+			task:=tp.task
+			wk.doTask(task)
 		}
 
 	}
@@ -63,6 +77,45 @@ func Worker(mapf func(string, string) []KeyValue,
 
 }
 
+
+func(w*worker) doTask(task *Task){
+	taskPhase:=task.Phase
+	switch taskPhase{
+		case MapPhase :{
+			w.doMapTask(task)
+		}
+		case ReducePhase:{
+			
+		}
+	}
+	
+}
+
+func (w *worker) doMapTask(task *Task) {
+	filename:=task.FileName
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatalf("cannot open %v", filename)
+		//Todo:report failure
+		//w.reportTask
+	}
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatalf("cannot read %v", filename)
+		//Todo:report failure
+	}
+	file.Close()
+	kvArray := wk.mapf(filename, string(content))
+	//todo:write into tempfile
+}
+
+func generateMapFileName(mapNum int,reduceNum int) string {
+	return fmt.Sprintf("mr-tmp-%d-%d",mapNum,reduceNum)
+}
+
+func generateReduceFileName(reduceNum int) string{
+	return fmt.Sprintf("mr-out-%d",reduceNum)
+}
 
 //
 // send an RPC request to the master, wait for the response.
