@@ -1,6 +1,7 @@
 package mr
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -95,18 +96,44 @@ func (w *worker) doMapTask(task *Task) {
 	filename:=task.FileName
 	file, err := os.Open(filename)
 	if err != nil {
-		log.Fatalf("cannot open %v", filename)
 		//Todo:report failure
-		//w.reportTask
+		task.State=Failed
+		w.reportTask(task)
+		DPrint("cannot open %v", filename)
 	}
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Fatalf("cannot read %v", filename)
 		//Todo:report failure
+		task.State=Failed
+		w.reportTask(task)
+		DPrint("cannot read %v", filename)
+
 	}
 	file.Close()
 	kvArray := wk.mapf(filename, string(content))
-	//todo:write into tempfile
+
+	//write into tempfile
+	nReduce:=task.Nreduce
+	var encoder *json.Encoder
+	for _,kv:=range kvArray {
+		k:=kv.Key
+		reduceNum:=ihash(k)%nReduce
+		tempFileName:=generateMapFileName(task.MapNumber,reduceNum)
+		file, err = os.Open(tempFileName)
+		if err != nil {
+			task.State=Failed
+			w.reportTask(task)
+			DPrint("cannot open %v", filename)
+		}
+		encoder=json.NewEncoder(file)
+		encoder.Encode(&kv)
+		file.Close()
+	}
+
+}
+
+func (w *worker) reportTask(task *Task) {
+
 }
 
 func generateMapFileName(mapNum int,reduceNum int) string {
