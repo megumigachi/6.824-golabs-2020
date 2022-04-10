@@ -54,6 +54,7 @@ func (m *Master) RequestTask(args *TaskRequestArgs, reply *TaskRequestReply) err
 			}
 			if mapTask.State == Todo {
 				mapTask.StartTime = time.Now()
+				mapTask.State = Doing
 				reply.ok = true
 				reply.task = mapTask
 				find = true
@@ -66,6 +67,7 @@ func (m *Master) RequestTask(args *TaskRequestArgs, reply *TaskRequestReply) err
 			}
 			if reduceTask.State == Todo {
 				reduceTask.StartTime = time.Now()
+				reduceTask.State = Doing
 				reply.ok = true
 				reply.task = reduceTask
 				find = true
@@ -75,6 +77,38 @@ func (m *Master) RequestTask(args *TaskRequestArgs, reply *TaskRequestReply) err
 	if !find {
 		reply.ok = false
 		reply.reason = wait
+	}
+	return nil
+}
+
+//理论不会引起冲突?
+func (m *Master) ReportTask(args *TaskReportArgs, reply *TaskReportReply) error {
+	mu.Lock()
+	defer mu.Unlock()
+	task := args.task
+	if task.State == Failed {
+		t := m.findTask(task)
+		t.State=Todo
+	}else if task.State==Done{
+		t:=m.findTask(task)
+		t.State=Done
+		if t.Phase==MapPhase {
+			for _,ta:=range m.mapTasks  {
+				if ta.State!=Done{
+					break
+				}
+			}
+			m.mapDone=true
+		} else if t.Phase==ReducePhase {
+			for _,ta:=range m.reduceTasks  {
+				if ta.State!=Done{
+					break
+				}
+			}
+			m.reduceDone=true
+		}
+	}else {
+
 	}
 	return nil
 }
@@ -100,10 +134,30 @@ func (m *Master) server() {
 //
 func (m *Master) Done() bool {
 	ret := m.reduceDone
-
-	// Your code here.
-
 	return ret
+}
+
+func (m *Master) findTask(task *Task) *Task {
+	switch task.Phase {
+		case MapPhase:
+			{
+				for _, t := range m.mapTasks {
+					if t.MapNumber == task.MapNumber {
+						return t
+					}
+				}
+			}
+		case ReducePhase:
+			{
+				for _, t := range m.reduceTasks {
+					if t.ReduceNumber == task.ReduceNumber {
+						return t
+					}
+				}
+			}
+
+	}
+	return nil
 }
 
 //

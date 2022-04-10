@@ -52,7 +52,6 @@ func Worker(mapf func(string, string) []KeyValue,
 		tp:=&TaskRequestReply{}
 		ok:=call("Master.RequestTask",ta,tp)
 		if !ok {
-			//master error?
 			DPrint("error while requesting")
 			os.Exit(1)
 		}
@@ -68,13 +67,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			task:=tp.task
 			wk.doTask(task)
 		}
-
 	}
-
-	// Your worker implementation here.
-
-	// uncomment to send the Example RPC to the master.
-	// CallExample()
 
 }
 
@@ -86,7 +79,7 @@ func(w*worker) doTask(task *Task){
 			w.doMapTask(task)
 		}
 		case ReducePhase:{
-			
+			w.doReduceTask(task)
 		}
 	}
 	
@@ -98,42 +91,96 @@ func (w *worker) doMapTask(task *Task) {
 	if err != nil {
 		//Todo:report failure
 		task.State=Failed
-		w.reportTask(task)
-		DPrint("cannot open %v", filename)
+		w.reportTask(task,err)
+		return
 	}
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
 		//Todo:report failure
 		task.State=Failed
-		w.reportTask(task)
-		DPrint("cannot read %v", filename)
-
+		w.reportTask(task, err)
+		return
 	}
 	file.Close()
 	kvArray := wk.mapf(filename, string(content))
 
-	//write into tempfile
 	nReduce:=task.Nreduce
-	var encoder *json.Encoder
+	reduceArray:=make([][]KeyValue,nReduce)
 	for _,kv:=range kvArray {
-		k:=kv.Key
-		reduceNum:=ihash(k)%nReduce
-		tempFileName:=generateMapFileName(task.MapNumber,reduceNum)
-		file, err = os.Open(tempFileName)
-		if err != nil {
-			task.State=Failed
-			w.reportTask(task)
-			DPrint("cannot open %v", filename)
-		}
-		encoder=json.NewEncoder(file)
-		encoder.Encode(&kv)
-		file.Close()
+		hash:=ihash(kv.Key)%nReduce
+		reduceArray[hash]=append(reduceArray[hash], kv)
 	}
+	mapNum:=task.MapNumber
+	for idx,rArray:=range reduceArray {
+		filename=generateMapFileName(mapNum,idx)
+		f,err:=os.Create(filename)
+		if err!=nil{
+			task.State=Failed
+			w.reportTask(task,err)
+			return
+		}
+		enc := json.NewEncoder(f)
+		for _, kv := range rArray {
+			if err := enc.Encode(&kv); err != nil {
+				task.State=Failed
+				w.reportTask(task,err)
+				return
+			}
+		}
+		if err := f.Close(); err != nil {
+			task.State=Failed
+			w.reportTask(task,err)
+			return
+		}
+	}
+	task.State=Done
+	w.reportTask(task,nil)
 
 }
 
-func (w *worker) reportTask(task *Task) {
+func (w *worker) reportTask(task *Task, err error) {
+	if err!=nil {
+		log.Println("report task: err:",err)
+	}
+	ta:=&TaskReportArgs{task}
+	tp:=&TaskReportReply{}
+	call("Master.ReportTask",ta,tp)
+}
 
+func (w *worker) doReduceTask(task *Task) {
+	reduceNum:=task.ReduceNumber
+	mapNum:=task.MapNumber
+	rdMap:=make(map[string][]string)
+
+	for i:=0;i<mapNum ;i++  {
+		mapFN:=generateMapFileName(i,reduceNum)
+		f,err:= os.Open(mapFN)
+		if err!=nil {
+			task.State=Failed
+			w.reportTask(task,err)
+		}
+		dec:=json.NewDecoder(f)
+		for {
+			var kv KeyValue
+			if err := dec.Decode(&kv); err != nil {
+				break
+			}
+			rdMap[kv.Key]= append(rdMap[kv.Key], kv.Value)
+		}
+		if err :=f.Close(); err != nil {
+			task.State=Failed
+			w.reportTask(task,err)
+		}
+	}
+	rFileName:=generateReduceFileName(reduceNum)
+	f,_:= os.Create(rFileName)
+	for str,val:=range rdMap {
+		rets:=wk.reducef(str,val)
+		fmt.Fprintf(f, "%v %v\n", str, rets)
+	}
+	f.Close()
+	task.State=Done
+	w.reportTask(task,nil)
 }
 
 func generateMapFileName(mapNum int,reduceNum int) string {

@@ -49,7 +49,7 @@ func NewTask(phase TaskPhase, state TaskState, mapNumber int, reduceNumber int, 
 }
 
 //log
-func DPrint(str string, v interface{})  {
+func DPrint(str string, v ...interface{})  {
 	if debug {
 		log.Printf(str,v)
 	}

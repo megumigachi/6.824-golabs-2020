@@ -14,13 +14,6 @@ import "strconv"
 // and reply for an RPC.
 //
 
-type ExampleArgs struct {
-	X int
-}
-
-type ExampleReply struct {
-	Y int
-}
 
 // Add your RPC definitions here.
 // 请求任务
@@ -32,6 +25,14 @@ type TaskRequestReply struct {
 	task *Task
 	ok bool
 	reason Reason
+}
+
+type TaskReportArgs struct {
+	task *Task
+}
+
+type TaskReportReply struct {
+
 }
 
 
