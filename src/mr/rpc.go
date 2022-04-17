@@ -14,27 +14,26 @@ import "strconv"
 // and reply for an RPC.
 //
 
-
 // Add your RPC definitions here.
 // 请求任务
 type TaskRequestArgs struct {
 	//workerId int
 }
+
 //
 type TaskRequestReply struct {
-	task *Task
-	ok bool
-	reason Reason
+	Task   *Task
+	OK     bool
+	Reason Reason
 }
 
 type TaskReportArgs struct {
-	task *Task
+	Task *Task
 }
 
 type TaskReportReply struct {
-
+	OK bool
 }
-
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the master.

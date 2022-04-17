@@ -21,7 +21,7 @@ type KeyValue struct {
 
 //
 // use ihash(key) % NReduce to choose the reduce
-// task number for each KeyValue emitted by Map.
+// Task number for each KeyValue emitted by Map.
 //
 func ihash(key string) int {
 	h := fnv.New32a()
@@ -55,16 +55,16 @@ func Worker(mapf func(string, string) []KeyValue,
 			DPrint("error while requesting")
 			os.Exit(1)
 		}
-		if !tp.ok {
-			if tp.reason==finished {
-				DPrint("Worker exit: all task finished")
+		if !tp.OK {
+			if tp.Reason ==finished {
+				DPrint("Worker exit: all Task finished")
 				os.Exit(0)
-			}else if tp.reason==wait {
-				DPrint("Worker: no task available now, waiting")
+			}else if tp.Reason ==wait {
+				DPrint("Worker: no Task available now, waiting")
 				time.Sleep(1*time.Second)
 			}
 		}else {
-			task:=tp.task
+			task:=tp.Task
 			wk.doTask(task)
 		}
 	}
@@ -74,6 +74,7 @@ func Worker(mapf func(string, string) []KeyValue,
 
 func(w*worker) doTask(task *Task){
 	taskPhase:=task.Phase
+	DPrint("worker doing task: taskphase:%d, map:%d, reduce:%d, state:%d ,filename:%s",task.Phase,task.MapNumber,task.ReduceNumber,task.State,task.FileName)
 	switch taskPhase{
 		case MapPhase :{
 			w.doMapTask(task)
@@ -140,7 +141,9 @@ func (w *worker) doMapTask(task *Task) {
 
 func (w *worker) reportTask(task *Task, err error) {
 	if err!=nil {
-		log.Println("report task: err:",err)
+		DError(err)
+	}else {
+		DPrint("worker report task: taskphase:%d, map:%d, reduce:%d, state:%d ,filename:%s",task.Phase,task.MapNumber,task.ReduceNumber,task.State,task.FileName)
 	}
 	ta:=&TaskReportArgs{task}
 	tp:=&TaskReportReply{}
@@ -158,6 +161,7 @@ func (w *worker) doReduceTask(task *Task) {
 		if err!=nil {
 			task.State=Failed
 			w.reportTask(task,err)
+			return
 		}
 		dec:=json.NewDecoder(f)
 		for {

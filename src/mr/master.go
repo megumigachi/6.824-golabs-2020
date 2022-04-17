@@ -31,9 +31,11 @@ func (m *Master) initTasks() {
 	for i, filename := range m.mapFiles {
 		m.mapTasks = append(m.mapTasks, NewTask(MapPhase, Todo, i, -1, m.nReduce, filename))
 	}
+	//fmt.Println(m.mapTasks)
 	for i := 0; i < m.nReduce; i++ {
 		m.reduceTasks = append(m.reduceTasks, NewTask(ReducePhase, Todo, len(m.mapFiles), i, m.nReduce, "r"))
 	}
+	//fmt.Println(m.reduceTasks)
 }
 
 func (m *Master) RequestTask(args *TaskRequestArgs, reply *TaskRequestReply) error {
@@ -43,8 +45,8 @@ func (m *Master) RequestTask(args *TaskRequestArgs, reply *TaskRequestReply) err
 	var find bool
 	//all finished发
 	if m.reduceDone {
-		reply.ok = false
-		reply.reason = finished
+		reply.OK = false
+		reply.Reason = finished
 		return nil
 	}
 	if !m.mapDone {
@@ -55,8 +57,8 @@ func (m *Master) RequestTask(args *TaskRequestArgs, reply *TaskRequestReply) err
 			if mapTask.State == Todo {
 				mapTask.StartTime = time.Now()
 				mapTask.State = Doing
-				reply.ok = true
-				reply.task = mapTask
+				reply.OK = true
+				reply.Task = mapTask
 				find = true
 			}
 		}
@@ -68,15 +70,15 @@ func (m *Master) RequestTask(args *TaskRequestArgs, reply *TaskRequestReply) err
 			if reduceTask.State == Todo {
 				reduceTask.StartTime = time.Now()
 				reduceTask.State = Doing
-				reply.ok = true
-				reply.task = reduceTask
+				reply.OK = true
+				reply.Task = reduceTask
 				find = true
 			}
 		}
 	}
 	if !find {
-		reply.ok = false
-		reply.reason = wait
+		reply.OK = false
+		reply.Reason = wait
 	}
 	return nil
 }
@@ -85,7 +87,7 @@ func (m *Master) RequestTask(args *TaskRequestArgs, reply *TaskRequestReply) err
 func (m *Master) ReportTask(args *TaskReportArgs, reply *TaskReportReply) error {
 	mu.Lock()
 	defer mu.Unlock()
-	task := args.task
+	task := args.Task
 	if task.State == Failed {
 		t := m.findTask(task)
 		t.State=Todo
@@ -93,19 +95,23 @@ func (m *Master) ReportTask(args *TaskReportArgs, reply *TaskReportReply) error 
 		t:=m.findTask(task)
 		t.State=Done
 		if t.Phase==MapPhase {
+			m.mapDone=true
 			for _,ta:=range m.mapTasks  {
 				if ta.State!=Done{
+					m.mapDone=false
 					break
 				}
 			}
-			m.mapDone=true
+
 		} else if t.Phase==ReducePhase {
+			m.reduceDone=true
 			for _,ta:=range m.reduceTasks  {
 				if ta.State!=Done{
+					m.reduceDone=false
 					break
 				}
 			}
-			m.reduceDone=true
+
 		}
 	}else {
 
