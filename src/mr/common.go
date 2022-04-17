@@ -1,7 +1,9 @@
 package mr
 
 import (
+	"github.com/pkg/errors"
 	"log"
+	"os"
 	"time"
 )
 
@@ -27,6 +29,20 @@ type Reason int
 const wait Reason = 0
 const finished Reason  = 1
 
+
+//log format & file
+func init() {
+	file := "./" +"error"+ ".txt"
+	logFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0766)
+	if err != nil {
+		panic(err)
+	}
+	log.SetOutput(logFile) // 将文件设置为log输出的文件
+	//log.SetPrefix("[qSkipTool]")
+	log.SetFlags(log.LstdFlags | log.Lshortfile | log.LUTC)
+	return
+}
+
 //有没有必要保存task对应的workerid？
 type Task struct {
 	Phase        TaskPhase
@@ -43,6 +59,8 @@ type Task struct {
 	FileName	string
 }
 
+
+
 //constructor
 func NewTask(phase TaskPhase, state TaskState, mapNumber int, reduceNumber int, nreduce int, fileName string) *Task {
 	return &Task{Phase: phase, State: state, MapNumber: mapNumber, ReduceNumber: reduceNumber, Nreduce: nreduce,  FileName: fileName}
@@ -51,6 +69,17 @@ func NewTask(phase TaskPhase, state TaskState, mapNumber int, reduceNumber int, 
 //log
 func DPrint(str string, v ...interface{})  {
 	if debug {
-		log.Printf(str,v)
+		log.SetPrefix("[Print:]")
+		log.Printf(str,v...)
 	}
 }
+
+func DError(err error){
+	if debug{
+		log.SetPrefix("[Error:]")
+		err=errors.WithStack(err)
+		log.Printf(" err is %+v\n", err)
+	}
+}
+
+
