@@ -65,7 +65,18 @@ type Raft struct {
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+	currentTerm int
+	voteFor   int
+	//todo  log
+	//log
 
+	//volatile server state
+	commitIndex int
+	lastApplied int
+
+	//volatile leader state
+	nextIndex	[]int
+	matchedIndex	[]int
 }
 
 
@@ -227,7 +238,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.persister = persister
 	rf.me = me
 
+	//
+
+
 	// Your initialization code here (2A, 2B, 2C).
+
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
