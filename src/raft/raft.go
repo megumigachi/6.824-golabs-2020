@@ -18,7 +18,9 @@ package raft
 //
 
 import (
+	"math/rand"
 	"sync"
+	"time"
 )
 import "sync/atomic"
 import "../labrpc"
@@ -53,6 +55,13 @@ const (
 //
 // A Go object implementing a single Raft peer.
 //
+
+const (
+	ElectionTimeout=300
+	HeartBeatTimeOut=100
+	RpcToleranceTimeOut=100
+)
+
 type Raft struct {
 	mu        sync.Mutex          // Lock to protect shared access to this peer's state
 	peers     []*labrpc.ClientEnd // RPC end points of all peers
@@ -60,23 +69,39 @@ type Raft struct {
 	me        int                 // this peer's index into peers[]
 	dead      int32               // set by Kill()
 
-	role      int
-	lockName  string
+	role     int
+	lockName string
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
 	currentTerm int
-	voteFor   int
+	voteFor     int
 	//todo  log
-	//log
+	log []Log
 
 	//volatile server state
 	commitIndex int
 	lastApplied int
 
 	//volatile leader state
-	nextIndex	[]int
-	matchedIndex	[]int
+	nextIndex     []int
+	matchedIndex  []int
+
+	//other
+	electionTimer *time.Timer
+
+	//leader
+	heartBeatTimer *time.Timer
+
+	//
+	stopSignal chan int
+}
+
+
+type Log struct {
+	Term    int
+	Index     int
+	Command interface{}
 }
 
 
@@ -84,10 +109,13 @@ type Raft struct {
 // return currentTerm and whether this server
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
-
+	rf.lock("getState")
+	defer rf.unlock("getState")
 	var term int
 	var isleader bool
 	// Your code here (2A).
+	term=rf.currentTerm
+	isleader=rf.role==Leader
 	return term, isleader
 }
 
@@ -134,46 +162,19 @@ func (rf* Raft) lock(name string){
 	rf.lockName=name
 }
 
-func (rf* Raft) unlock(){
+func (rf* Raft) unlock(name string){
 	rf.mu.Unlock()
 	rf.lockName=""
 }
 
 
 
+
 //
-// example code to send a RequestVote RPC to a server.
-// server is the index of the target server in rf.peers[].
-// expects RPC arguments in args.
-// fills in *reply with RPC reply, so caller should
-// pass &reply.
-// the types of the args and reply passed to Call() must be
-// the same as the types of the arguments declared in the
-// handler function (including whether they are pointers).
-//
-// The labrpc package simulates a lossy network, in which servers
-// may be unreachable, and in which requests and replies may be lost.
-// Call() sends a request and waits for a reply. If a reply arrives
-// within a timeout interval, Call() returns true; otherwise
-// Call() returns false. Thus Call() may not return for a while.
-// A false return can be caused by a dead server, a live server that
-// can't be reached, a lost request, or a lost reply.
-//
-// Call() is guaranteed to return (perhaps after a delay) *except* if the
-// handler function on the server side does not return.  Thus there
-// is no need to implement your own timeouts around Call().
-//
-// look at the comments in ../labrpc/labrpc.go for more details.
-//
-// if you're having trouble getting RPC to work, check that you've
-// capitalized all field names in structs passed over RPC, and
-// that the caller passes the address of the reply struct with &, not
-// the struct itself.
-//
-func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool {
-	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
-	return ok
+func (rf *Raft) generateRandomElectionTimeOut() time.Duration{
+	return time.Duration(rand.Intn(300) + ElectionTimeout)*time.Millisecond
 }
+
 
 //
 // the service using Raft (e.g. a k/v server) wants to start
@@ -220,6 +221,12 @@ func (rf *Raft) killed() bool {
 	return z == 1
 }
 
+func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
+
+}
+
+
+
 //
 // the service or tester wants to create a Raft server. the ports
 // of all the Raft servers (including this one) are in peers[]. this
@@ -238,8 +245,18 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.persister = persister
 	rf.me = me
 
+	rf.electionTimer=time.NewTimer(rf.generateRandomElectionTimeOut())
 	//
-
+	go func() {
+		for   {
+			select {
+				case <-rf.stopSignal:
+					return;
+				case <-rf.electionTimer.C:
+					rf.startElection()
+			}
+		}
+	}()
 
 	// Your initialization code here (2A, 2B, 2C).
 
