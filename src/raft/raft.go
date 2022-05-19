@@ -91,9 +91,10 @@ type Raft struct {
 	electionTimer *time.Timer
 
 	//leader
-	heartBeatTimer *time.Timer
+	//heartBeatTimer *time.Timer
+	appendEntriesTimers []*time.Timer
 
-	//
+
 	stopSignal chan int
 }
 
@@ -214,6 +215,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
+	rf.stopSignal<-1
 }
 
 func (rf *Raft) killed() bool {
@@ -222,10 +224,31 @@ func (rf *Raft) killed() bool {
 }
 
 func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
-
+	rf.lock("getLogIndx")
+	defer rf.unlock("getLogIdx")
+	log:=rf.log
+	return len(log),log[len(log)-1].Term
 }
 
-
+func (rf* Raft) changeRole(role int)  {
+	rf.lock("changeRole")
+	defer rf.unlock("changeRole")
+	if role==rf.role {
+		return
+	}
+	rf.role=role
+	if role==Follower||role==Candidate {
+		rf.electionTimer.Reset(ElectionTimeout)
+		for i:=0;i< len(rf.appendEntriesTimers); i++ {
+			rf.appendEntriesTimers[i].Stop()
+		}
+	}else {
+		rf.electionTimer.Stop()
+		for i:=0;i<len(rf.appendEntriesTimers) ;i++  {
+			rf.appendEntriesTimers[i].Reset(HeartBeatTimeOut)
+		}
+	}
+}
 
 //
 // the service or tester wants to create a Raft server. the ports
@@ -246,17 +269,45 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 
 	rf.electionTimer=time.NewTimer(rf.generateRandomElectionTimeOut())
-	//
+	rf.appendEntriesTimers=make([]*time.Timer, len(peers))
+	for i:=0;i<len(peers) ;i++  {
+		rf.appendEntriesTimers[i]=time.NewTimer(HeartBeatTimeOut)
+	}
+	rf.changeRole(Follower)
+	//rf.electionTimer.Stop()
+
+	// election listener
 	go func() {
 		for   {
 			select {
 				case <-rf.stopSignal:
 					return;
-				case <-rf.electionTimer.C:
+				case <-rf.electionTimer.C:{
+					rf.changeRole(Candidate)
 					rf.startElection()
+				}
 			}
 		}
 	}()
+
+	//append entries
+	for i:=0;i< len(rf.peers);i++  {
+		if i==rf.me {
+			continue
+		}
+		go func() {
+			for   {
+				select {
+					case <-rf.stopSignal:
+						return;
+					case <-rf.appendEntriesTimers[i].C:{
+						rf.appendEntriesToFollower(i)
+					}
+				}
+			}
+		}()
+	}
+
 
 	// Your initialization code here (2A, 2B, 2C).
 

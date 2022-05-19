@@ -45,7 +45,7 @@ func (rf *Raft) startElection() {
 	rf.lock("startElection")
 	defer rf.unlock("startElection")
 	//是否需要defer?
-	defer rf.resetElectionTimer()
+	//defer rf.resetElectionTimer()
 
 	wg:=sync.WaitGroup{}
 	reqArg:=&RequestVoteArgs{}
@@ -79,12 +79,16 @@ func (rf *Raft) startElection() {
 		if reply.VoteGranted{
 			voteGathered++
 		}else {
-
+			if reply.Term>rf.currentTerm {
+				rf.changeRole(Follower)
+				return
+			}
 		}
 	}
 
 	if voteGathered>=len(rf.peers)/2+1 {
 		//todo: become leader
+		rf.changeRole(Leader)
 	}
 
 }
