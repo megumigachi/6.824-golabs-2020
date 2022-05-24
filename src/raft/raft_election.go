@@ -32,6 +32,41 @@ type RequestVoteReply struct {
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
+	rf.lock("dealingRequestVote")
+	rf.unlock("dealingRequestVote")
+	reply.Term=rf.currentTerm
+	reply.VoteGranted=false
+	
+	reqTerm:=args.Term
+	reqLogTerm:=args.LastLogTerm
+	reqLogIdx:=args.LastLogIndex
+	
+	if rf.currentTerm>reqTerm{
+		return
+	}else {
+		idx,term:=rf.getLastLogIdxAndTerm()
+		//如果任期比请求小，需要重置votefor
+		if rf.currentTerm<reqTerm {
+			rf.currentTerm=reqTerm
+			rf.voteFor=-1
+			rf.changeRole(Follower)
+		}
+
+		if rf.voteFor==args.CandidateId {
+			reply.VoteGranted=true
+			return
+		}else if rf.voteFor!=-1&&rf.voteFor!=args.CandidateId{
+			return
+		}else {
+			if reqLogTerm<term||(reqLogTerm==term&&reqLogIdx<idx) {
+				return
+			}else {
+				rf.voteFor=args.CandidateId
+				reply.VoteGranted=true
+				return
+			}
+		}
+	}
 }
 
 
@@ -42,8 +77,9 @@ func (rf *Raft) resetElectionTimer() {
 
 
 func (rf *Raft) startElection() {
+	//解决死锁：减小粒度
 	rf.lock("startElection")
-	defer rf.unlock("startElection")
+
 	//是否需要defer?
 	//defer rf.resetElectionTimer()
 
@@ -51,21 +87,25 @@ func (rf *Raft) startElection() {
 	reqArg:=&RequestVoteArgs{}
 	reqArg.Term=rf.currentTerm
 	reqArg.CandidateId=rf.me
+
 	reqArg.LastLogIndex,reqArg.LastLogTerm=rf.getLastLogIdxAndTerm()
 
+	rf.unlock("startElection")
 
 	//vote for self
 	voteGathered:=1
 	//gather voteReplys
 	replys:=make([]*RequestVoteReply,0)
 	for i:=0;i< len(rf.peers);i++  {
+		idx:=i
 		reqReply:=&RequestVoteReply{}
-		if i==rf.me {
+		if idx==rf.me {
 			continue
 		}
 		wg.Add(1)
 		go func() {
-			flag:=rf.sendRequestVote(i,reqArg,reqReply)
+			flag:=rf.sendRequestVote(idx,reqArg,reqReply)
+			//fmt.Printf("self-id:%d,target-id:%d,flag:%t\n",rf.me,idx,flag)
 			//network failure
 			if !flag {
 			}else {
@@ -75,6 +115,7 @@ func (rf *Raft) startElection() {
 		}()
 	}
 	wg.Wait()
+
 	for _,reply:=range(replys)  {
 		if reply.VoteGranted{
 			voteGathered++
@@ -89,6 +130,8 @@ func (rf *Raft) startElection() {
 	if voteGathered>=len(rf.peers)/2+1 {
 		//todo: become leader
 		rf.changeRole(Leader)
+	}else {
+		rf.resetElectionTimer()
 	}
 
 }

@@ -308,6 +308,7 @@ func (cfg *config) checkOneLeader() int {
 		for i := 0; i < cfg.n; i++ {
 			if cfg.connected[i] {
 				if term, leader := cfg.rafts[i].GetState(); leader {
+					log.Printf("i:=%d,term=%d,role=%t",i,term,leader)
 					leaders[term] = append(leaders[term], i)
 				}
 			}

@@ -18,6 +18,8 @@ package raft
 //
 
 import (
+	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -94,6 +96,10 @@ type Raft struct {
 	//heartBeatTimer *time.Timer
 	appendEntriesTimers []*time.Timer
 
+	//
+	debugTimer *time.Timer
+
+	lockTime time.Time
 
 	stopSignal chan int
 }
@@ -160,11 +166,13 @@ func (rf *Raft) readPersist(data []byte) {
 
 func (rf* Raft) lock(name string){
 	rf.mu.Lock()
+	rf.lockTime=time.Now()
 	rf.lockName=name
 }
 
 func (rf* Raft) unlock(name string){
-	rf.mu.Unlock()
+	defer rf.mu.Unlock()
+	log.Printf("server id :%d,unlock from %s",rf.me,rf.lockName)
 	rf.lockName=""
 }
 
@@ -173,7 +181,7 @@ func (rf* Raft) unlock(name string){
 
 //
 func (rf *Raft) generateRandomElectionTimeOut() time.Duration{
-	return time.Duration(rand.Intn(300) + ElectionTimeout)*time.Millisecond
+	return time.Duration(rand.Intn(150) + ElectionTimeout)*time.Millisecond
 }
 
 
@@ -224,19 +232,23 @@ func (rf *Raft) killed() bool {
 }
 
 func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
-	rf.lock("getLogIndx")
-	defer rf.unlock("getLogIdx")
+	//rf.lock("getLogIndx")
+	//defer rf.unlock("getLogIdx")
 	log:=rf.log
+	if len(log)==0 {
+		return 0,0
+	}
 	return len(log),log[len(log)-1].Term
 }
 
 func (rf* Raft) changeRole(role int)  {
 	rf.lock("changeRole")
 	defer rf.unlock("changeRole")
-	if role==rf.role {
-		return
-	}
+
+	// change role
 	rf.role=role
+
+	// deal with timers
 	if role==Follower||role==Candidate {
 		rf.electionTimer.Reset(ElectionTimeout)
 		for i:=0;i< len(rf.appendEntriesTimers); i++ {
@@ -247,6 +259,20 @@ func (rf* Raft) changeRole(role int)  {
 		for i:=0;i<len(rf.appendEntriesTimers) ;i++  {
 			rf.appendEntriesTimers[i].Reset(HeartBeatTimeOut)
 		}
+	}
+
+	// set leader state
+
+	// prepare for election
+	if role ==Candidate {
+		rf.currentTerm++
+		rf.voteFor=rf.me
+	}
+}
+
+func (rf *Raft) reportState() {
+	if Debug>0{
+		log.Printf("id:%d  role:%d  lockname:%s",rf.me,rf.role,rf.lockName)
 	}
 }
 
@@ -275,6 +301,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	}
 	rf.changeRole(Follower)
 	//rf.electionTimer.Stop()
+	rf.voteFor=-1
+	rf.log=make([]Log,0)
 
 	// election listener
 	go func() {
@@ -292,16 +320,18 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	//append entries
 	for i:=0;i< len(rf.peers);i++  {
-		if i==rf.me {
+		idx:=i
+		if idx==rf.me {
 			continue
 		}
 		go func() {
+			//log.Printf("i=%d",idx)
 			for   {
 				select {
 					case <-rf.stopSignal:
 						return;
-					case <-rf.appendEntriesTimers[i].C:{
-						rf.appendEntriesToFollower(i)
+					case <-rf.appendEntriesTimers[idx].C:{
+						rf.appendEntriesToFollower(idx)
 					}
 				}
 			}
@@ -309,11 +339,21 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	}
 
 
+	rf.debugTimer=time.NewTimer(500*time.Microsecond)
+	//debug : watching lockName
+	go func() {
+		for !rf.killed() {
+			time.Sleep(time.Second * 2)
+			fmt.Println(fmt.Sprintf("rf who has lock:%s, time:%v", rf.lockName, time.Now().Sub(rf.lockTime)))
+			fmt.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
+		}
+
+	}()
+
 	// Your initialization code here (2A, 2B, 2C).
 
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
-
 	return rf
 }

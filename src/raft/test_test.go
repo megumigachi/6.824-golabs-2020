@@ -8,7 +8,9 @@ package raft
 // test with the original before submitting.
 //
 
-import "testing"
+import (
+	"testing"
+)
 import "fmt"
 import "time"
 import "math/rand"
@@ -28,6 +30,8 @@ func TestInitialElection2A(t *testing.T) {
 
 	// is a leader elected?
 	cfg.checkOneLeader()
+
+
 
 	// sleep a bit to avoid racing with followers learning of the
 	// election, then check that all peers agree on the term.
