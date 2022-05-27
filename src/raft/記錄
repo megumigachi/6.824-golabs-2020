@@ -1,0 +1,9 @@
+目前很明顯的問題：
+1、
+2022/05/27 09:32:43 raft_election.go:84: start election, id:2, term:1, time:301.967006ms
+2022/05/27 09:32:43 raft_election.go:84: start election, id:0, term:1, time:302.499928ms
+2022/05/27 09:32:43 raft_election.go:84: start election, id:1, term:2, time:302.576841ms
+2022/05/27 09:32:43 raft_election.go:141: become leader, id:2, term:2, time:302.75863ms
+2022/05/27 09:32:43 raft_election.go:133: lose election, id:0, term:1, time:303.14045ms
+在進行選舉的時候，2，0，1開始選舉 1 收到 2的选举消息将term置为1，然后又开始选举，此时2由于收到了1的选票成为领导
+（为什么大）
