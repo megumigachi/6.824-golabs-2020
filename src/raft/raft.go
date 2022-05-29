@@ -99,7 +99,11 @@ type Raft struct {
 	//
 	debugTimer *time.Timer
 
+
+	//for debug
 	lockTime time.Time
+	startTime time.Time
+
 
 	stopSignal chan int
 }
@@ -172,7 +176,7 @@ func (rf* Raft) lock(name string){
 
 func (rf* Raft) unlock(name string){
 	defer rf.mu.Unlock()
-	log.Printf("server id :%d,unlock from %s",rf.me,rf.lockName)
+	//log.Printf("server id :%d,unlock from %s, lock time %v",rf.me,rf.lockName,time.Now().Sub(rf.lockTime))
 	rf.lockName=""
 }
 
@@ -181,7 +185,8 @@ func (rf* Raft) unlock(name string){
 
 //
 func (rf *Raft) generateRandomElectionTimeOut() time.Duration{
-	return time.Duration(rand.Intn(150) + ElectionTimeout)*time.Millisecond
+	duration:=time.Duration(rand.Intn(300) + ElectionTimeout)*time.Millisecond
+	return duration
 }
 
 
@@ -223,7 +228,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
-	rf.stopSignal<-1
+	close(rf.stopSignal)
 }
 
 func (rf *Raft) killed() bool {
@@ -232,8 +237,7 @@ func (rf *Raft) killed() bool {
 }
 
 func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
-	//rf.lock("getLogIndx")
-	//defer rf.unlock("getLogIdx")
+
 	log:=rf.log
 	if len(log)==0 {
 		return 0,0
@@ -242,38 +246,56 @@ func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
 }
 
 func (rf* Raft) changeRole(role int)  {
-	rf.lock("changeRole")
-	defer rf.unlock("changeRole")
-
-	// change role
-	rf.role=role
-
-	// deal with timers
-	if role==Follower||role==Candidate {
-		rf.electionTimer.Reset(ElectionTimeout)
-		for i:=0;i< len(rf.appendEntriesTimers); i++ {
-			rf.appendEntriesTimers[i].Stop()
-		}
-	}else {
-		rf.electionTimer.Stop()
-		for i:=0;i<len(rf.appendEntriesTimers) ;i++  {
-			rf.appendEntriesTimers[i].Reset(HeartBeatTimeOut)
-		}
-	}
-
-	// set leader state
+	log.Printf("change role: serverid: %d,changerole %d, time:%v \n",rf.me,role,rf.getTimeLine())
 
 	// prepare for election
 	if role ==Candidate {
 		rf.currentTerm++
 		rf.voteFor=rf.me
 	}
+
+	if role==rf.role {
+		return
+	}
+
+	// change role
+	rf.role=role
+
+	// deal with timers
+	if role==Candidate||role==Follower {
+		rf.resetElectionTimer()
+		for i:=0;i< len(rf.appendEntriesTimers); i++ {
+			if rf.me==i {
+				continue
+			}
+			rf.appendEntriesTimers[i].Stop()
+		}
+	}
+
+	if role==Leader{
+		rf.electionTimer.Stop()
+		for i:=0;i<len(rf.appendEntriesTimers) ;i++  {
+			if rf.me==i {
+				continue
+			}
+			rf.appendEntriesTimers[i].Reset(HeartBeatTimeOut*time.Millisecond)
+		}
+	}
+
+	// set leader state
+
+
 }
 
 func (rf *Raft) reportState() {
 	if Debug>0{
 		log.Printf("id:%d  role:%d  lockname:%s",rf.me,rf.role,rf.lockName)
 	}
+}
+
+func (rf *Raft) getTimeLine() time.Duration {
+
+	return time.Now().Sub(rf.startTime)
 }
 
 //
@@ -293,25 +315,37 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
+	rf.startTime=time.Now()
+	rf.currentTerm=0
+	rf.role=-1
+	rf.stopSignal=make(chan int)
 
-	rf.electionTimer=time.NewTimer(rf.generateRandomElectionTimeOut())
+	rf.electionTimer=time.NewTimer(time.Duration(me+ElectionTimeout)*time.Millisecond)
 	rf.appendEntriesTimers=make([]*time.Timer, len(peers))
 	for i:=0;i<len(peers) ;i++  {
-		rf.appendEntriesTimers[i]=time.NewTimer(HeartBeatTimeOut)
+		if i==rf.me {
+			continue
+		}
+		rf.appendEntriesTimers[i]=time.NewTimer(HeartBeatTimeOut*time.Millisecond)
 	}
 	rf.changeRole(Follower)
+	//用来人造bug
+	//rf.electionTimer.Reset(time.Duration(me+ElectionTimeout)*time.Millisecond)
 	//rf.electionTimer.Stop()
 	rf.voteFor=-1
 	rf.log=make([]Log,0)
 
+
 	// election listener
+	//now:=time.Now()
 	go func() {
 		for   {
 			select {
 				case <-rf.stopSignal:
 					return;
 				case <-rf.electionTimer.C:{
-					rf.changeRole(Candidate)
+					//fmt.Printf("server id:%d start election, currentTerm: %d,time :%v \n",rf.me,rf.currentTerm,time.Now().Sub(now))
+
 					rf.startElection()
 				}
 			}
@@ -339,20 +373,18 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	}
 
 
-	rf.debugTimer=time.NewTimer(500*time.Microsecond)
+
 	//debug : watching lockName
-	go func() {
-		for !rf.killed() {
-			time.Sleep(time.Second * 2)
-			fmt.Println(fmt.Sprintf("rf who has lock:%s, time:%v", rf.lockName, time.Now().Sub(rf.lockTime)))
-			fmt.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
-		}
-
-	}()
-
+	//go func() {
+	//	for !rf.killed() {
+	//		time.Sleep(time.Millisecond * 300)
+	//		log.Println(fmt.Sprintf("server id:%d,lock:%s, time:%v", rf.me,rf.lockName, time.Now().Sub(rf.startTime)))
+	//		//log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
+	//	}
+	//
+	//}()
 	// Your initialization code here (2A, 2B, 2C).
-
-
+	log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 	return rf

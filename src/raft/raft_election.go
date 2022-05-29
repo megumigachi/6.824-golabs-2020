@@ -1,6 +1,8 @@
 package raft
 
 import (
+	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -33,7 +35,7 @@ type RequestVoteReply struct {
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 	rf.lock("dealingRequestVote")
-	rf.unlock("dealingRequestVote")
+	defer rf.unlock("dealingRequestVote")
 	reply.Term=rf.currentTerm
 	reply.VoteGranted=false
 	
@@ -53,6 +55,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		}
 
 		if rf.voteFor==args.CandidateId {
+			rf.resetElectionTimer()
 			reply.VoteGranted=true
 			return
 		}else if rf.voteFor!=-1&&rf.voteFor!=args.CandidateId{
@@ -63,6 +66,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 			}else {
 				rf.voteFor=args.CandidateId
 				reply.VoteGranted=true
+				rf.resetElectionTimer()
 				return
 			}
 		}
@@ -79,6 +83,8 @@ func (rf *Raft) resetElectionTimer() {
 func (rf *Raft) startElection() {
 	//解决死锁：减小粒度
 	rf.lock("startElection")
+	rf.changeRole(Candidate)
+	log.Printf("start election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 
 	//是否需要defer?
 	//defer rf.resetElectionTimer()
@@ -99,6 +105,7 @@ func (rf *Raft) startElection() {
 	for i:=0;i< len(rf.peers);i++  {
 		idx:=i
 		reqReply:=&RequestVoteReply{}
+		reqReply.VoteGranted=false
 		if idx==rf.me {
 			continue
 		}
@@ -108,7 +115,10 @@ func (rf *Raft) startElection() {
 			//fmt.Printf("self-id:%d,target-id:%d,flag:%t\n",rf.me,idx,flag)
 			//network failure
 			if !flag {
+				log.Printf("not receive vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
+				replys=append(replys, reqReply)
 			}else {
+				log.Printf("received vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
 				replys=append(replys, reqReply)
 			}
 			wg.Done()
@@ -116,12 +126,17 @@ func (rf *Raft) startElection() {
 	}
 	wg.Wait()
 
+
+	rf.lock("startElection_dealing_result")
+	defer rf.unlock("startElection_dealing_result")
+
 	for _,reply:=range(replys)  {
 		if reply.VoteGranted{
 			voteGathered++
 		}else {
 			if reply.Term>rf.currentTerm {
 				rf.changeRole(Follower)
+				log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 				return
 			}
 		}
@@ -129,10 +144,13 @@ func (rf *Raft) startElection() {
 
 	if voteGathered>=len(rf.peers)/2+1 {
 		//todo: become leader
+		log.Printf("become leader, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.changeRole(Leader)
 	}else {
+		log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.resetElectionTimer()
 	}
+	//log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 
 }
 
@@ -167,26 +185,53 @@ func (rf *Raft) startElection() {
 // the struct itself.
 //
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool{
-	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut)
+	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut*time.Millisecond)
+	now:=time.Now()
 	defer toleranceTimer.Stop()
-	for  {
-		select {
-			case <-toleranceTimer.C:
-				return false
+	boolchan:=make(chan bool)
+	go func() {
+		for  {
+			select {
+			case <-rf.stopSignal:{
+				boolchan<-false
+			}
+			case <-toleranceTimer.C:{
+				fmt.Printf("tolerance time:%v\n",time.Now().Sub(now))
+				boolchan<-false
+			}
 			default:
-			{
-				//Call always return, so it will end when tolerance timer goes out
-				//or ok is true
-				ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
-				if !ok {
-					time.Sleep(10 * time.Millisecond)
-					continue
-				} else {
-					return true
+				{
+					//当网络出错时，call可能会花费非常多的时间返回，我们这里希望在100ms之内返回，所以这里使用异步
+					ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
+					//if !ok {
+					//	time.Sleep(10 * time.Millisecond)
+					//	fmt.Printf("fail time:%v\n",time.Now().Sub(now))
+					//	continue
+					//} else {
+					//	fmt.Printf("true time:%v\n",time.Now().Sub(now))
+					//	boolchan<-true
+					//}
+					boolchan<-ok
 				}
 			}
 		}
-	}
+	}()
 
+	for   {
+		select {
+			case ok:=<-boolchan:{
+				if !ok{
+					continue
+				}else {
+					return true
+				}
+			}
+			case <-rf.stopSignal:
+				return false
+			case <-toleranceTimer.C:
+				return false
+
+		}
+	}
 
 }

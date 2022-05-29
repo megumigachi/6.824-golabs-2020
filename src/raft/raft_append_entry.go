@@ -1,7 +1,7 @@
 package raft
 
 import (
-	"fmt"
+	"log"
 	"time"
 )
 
@@ -10,7 +10,7 @@ import (
 // field names must start with capital letters!
 //
 type AppendEntriesArgs struct {
-	term int
+	Term int
 }
 
 //
@@ -26,42 +26,54 @@ type AppendEntriesReply struct {
 //
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	// Your code here (2A, 2B).
-	if rf.role!=Leader {
-		rf.electionTimer.Reset(ElectionTimeout*time.Microsecond)
-	}else {
-		fmt.Println(args)
-		if args.term>rf.currentTerm{
-			rf.changeRole(Follower)
-		}
+
+	rf.lock("dealingAppendEntries")
+	defer rf.unlock("dealingAppendEntries")
+
+	log.Printf("dealing append entries server id:%d, server role:%d,arg term:%d,time:%v\n",rf.me,rf.role,args.Term,time.Now().Sub(rf.startTime))
+
+
+	if args.Term>rf.currentTerm{
+		rf.changeRole(Follower)
+		return
+	}
+	if rf.role==Follower {
+		rf.electionTimer.Reset(ElectionTimeout*time.Millisecond)
+	}
+	if rf.role==Candidate&&args.Term>=rf.currentTerm{
+		rf.changeRole(Follower)
 	}
 	
 }
 
 func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 	rf.lock("appendEntries")
-	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut)
+	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut*time.Millisecond)
 	defer toleranceTimer.Stop()
 	args:=&AppendEntriesArgs{}
 	reply:=&AppendEntriesReply{}
-	args.term=rf.currentTerm
+	args.Term=rf.currentTerm
+	log.Printf("leader append entries server id:%d, server role:%d, term:%d ,target idx:%d,time:%v\n",rf.me,rf.role,rf.currentTerm,idx,time.Now().Sub(rf.startTime))
+	rf.appendEntriesTimers[idx].Reset(HeartBeatTimeOut*time.Millisecond)
 	rf.unlock("appendEntries")
-	for  {
+	boolchan:=make(chan bool)
+
+	go func() {
+
+		//同樣的理由，這裡改為異步，如果卡在這裡，服务器将无法响应rpc?(明明没有加锁，为什么?)
+		ok:=rf.peers[idx].Call("Raft.AppendEntries", args, reply)
+		boolchan<-ok
+
+	}()
+
+	for   {
 		select {
-		case <-toleranceTimer.C:
-			return false
-		default:
-			{
-				//Call always return, so it will end when tolerance timer goes out
-				//or ok is true
-				fmt.Printf("server id:%d, server role:%d, term:%d ,target idx:%d\n",rf.me,rf.role,args.term,idx)
-				ok := rf.peers[idx].Call("Raft.AppendEntries", args, reply)
-				if !ok {
-					time.Sleep(10 * time.Millisecond)
-					continue
-				} else {
-					return true
-				}
-			}
+			case <-rf.stopSignal:
+				return false
+			case <-toleranceTimer.C:
+				return false;
+			case ok:=<-boolchan:
+				return ok
 		}
 	}
 }
