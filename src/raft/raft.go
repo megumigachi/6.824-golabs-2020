@@ -205,12 +205,26 @@ func (rf *Raft) generateRandomElectionTimeOut() time.Duration{
 // the leader.
 //
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
-	index := -1
-	term := -1
-	isLeader := true
+	rf.lock("start")
+	index,_:=rf.getLastLogIdxAndTerm()
+	term := rf.currentTerm
+	isLeader := rf.role==Leader
 
 	// Your code here (2B).
+	if rf.role==Leader {
+		newLog:=Log{}
+		newLog.Term=rf.currentTerm
+		newLog.Command=command
+		rf.log=append(rf.log, newLog)
+		//对于每一个server立即发送一条append entry 请求
+		for _,t:=range rf.appendEntriesTimers {
+			t.Stop()
+			t.Reset(0)
+		}
 
+	}
+
+	rf.unlock("start")
 	return index, term, isLeader
 }
 
@@ -294,7 +308,6 @@ func (rf *Raft) reportState() {
 }
 
 func (rf *Raft) getTimeLine() time.Duration {
-
 	return time.Now().Sub(rf.startTime)
 }
 

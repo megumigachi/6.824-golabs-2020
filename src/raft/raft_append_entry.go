@@ -11,6 +11,11 @@ import (
 //
 type AppendEntriesArgs struct {
 	Term int
+	LeaderId int
+	PrevLogIndex int
+	PrevLogTerm int
+	entries []Log
+	leaderCommit int
 }
 
 //
@@ -18,7 +23,8 @@ type AppendEntriesArgs struct {
 // field names must start with capital letters!
 //
 type AppendEntriesReply struct {
-
+	term int
+	success bool
 }
 
 //
