@@ -216,8 +216,13 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		newLog.Term=rf.currentTerm
 		newLog.Command=command
 		rf.log=append(rf.log, newLog)
+		log.Printf("rf.id is%d,rf.log length is %d", rf.me,len(rf.log))
 		//对于每一个server立即发送一条append entry 请求
-		for _,t:=range rf.appendEntriesTimers {
+		for i:=0;i<rf.me;i++ {
+			if rf.me==i{
+				continue
+			}
+			t:=rf.appendEntriesTimers[i]
 			t.Stop()
 			t.Reset(0)
 		}
@@ -225,7 +230,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	}
 
 	rf.unlock("start")
-	return index, term, isLeader
+	return index+1, term, isLeader
 }
 
 //
@@ -243,6 +248,8 @@ func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
 	close(rf.stopSignal)
+	log.Println(fmt.Sprintf("killed: server id:%d,log length:%d,commitIdx:%d",rf.me,len(rf.log),rf.commitIndex))
+
 }
 
 func (rf *Raft) killed() bool {
@@ -254,13 +261,13 @@ func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
 
 	log:=rf.log
 	if len(log)==0 {
-		return 0,0
+		return -1,0
 	}
 	return len(log),log[len(log)-1].Term
 }
 
 func (rf* Raft) changeRole(role int)  {
-	log.Printf("change role: serverid: %d,changerole %d, time:%v \n",rf.me,role,rf.getTimeLine())
+	//log.Printf("change role: serverid: %d,changerole %d, time:%v \n",rf.me,role,rf.getTimeLine())
 
 	// prepare for election
 	if role ==Candidate {
@@ -268,9 +275,16 @@ func (rf* Raft) changeRole(role int)  {
 		rf.voteFor=rf.me
 	}
 
+
 	if role==rf.role {
 		return
 	}
+
+	//todo: init leader properties
+	if role==Leader {
+		rf.initLeaderProperties()
+	}
+
 
 	// change role
 	rf.role=role
@@ -310,6 +324,20 @@ func (rf *Raft) reportState() {
 func (rf *Raft) getTimeLine() time.Duration {
 	return time.Now().Sub(rf.startTime)
 }
+
+func (rf *Raft) initLeaderProperties() {
+	rf.nextIndex=make([]int, len(rf.peers))
+	rf.matchedIndex=make([]int, len(rf.peers))
+
+	idx,_:=rf.getLastLogIdxAndTerm()
+	for i:=0;i< len(rf.nextIndex);i++  {
+		rf.nextIndex[i]=idx+1
+		rf.matchedIndex[i]=-1
+	}
+}
+
+
+
 
 //
 // the service or tester wants to create a Raft server. the ports
@@ -391,8 +419,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	//go func() {
 	//	for !rf.killed() {
 	//		time.Sleep(time.Millisecond * 300)
-	//		log.Println(fmt.Sprintf("server id:%d,lock:%s, time:%v", rf.me,rf.lockName, time.Now().Sub(rf.startTime)))
+	//		//log.Println(fmt.Sprintf("server id:%d,lock:%s, time:%v", rf.me,rf.lockName, time.Now().Sub(rf.startTime)))
 	//		//log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
+	//		log.Println(fmt.Sprintf("server id:%d,log length:%d,commitIdx:%d",rf.me,len(rf.log),rf.commitIndex))
+	//
 	//	}
 	//
 	//}()

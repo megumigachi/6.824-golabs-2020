@@ -233,7 +233,7 @@ func (cfg *config) cleanup() {
 
 // attach server i to the net.
 func (cfg *config) connect(i int) {
-	log.Printf("connect(%d)\n", i)
+	//log.Printf("connect(%d)\n", i)
 
 	cfg.connected[i] = true
 
@@ -256,7 +256,7 @@ func (cfg *config) connect(i int) {
 
 // detach server i from the net.
 func (cfg *config) disconnect(i int) {
-	log.Printf("disconnect(%d)\n", i)
+	//log.Printf("disconnect(%d)\n", i)
 
 	cfg.connected[i] = false
 
@@ -372,6 +372,7 @@ func (cfg *config) nCommitted(index int) (int, interface{}) {
 
 		cfg.mu.Lock()
 		cmd1, ok := cfg.logs[i][index]
+		//fmt.Printf("id:%d  ,cmd:%v  ,ok:%v\n",i,cmd1,ok)
 		cfg.mu.Unlock()
 
 		if ok {
@@ -451,13 +452,15 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 				}
 			}
 		}
-
+		//fmt.Printf("index:%d\n",index)
 		if index != -1 {
 			// somebody claimed to be the leader and to have
 			// submitted our command; wait a while for agreement.
 			t1 := time.Now()
 			for time.Since(t1).Seconds() < 2 {
 				nd, cmd1 := cfg.nCommitted(index)
+				//fmt.Printf("nd:%d\n",nd)
+
 				if nd > 0 && nd >= expectedServers {
 					// committed
 					if cmd1 == cmd {

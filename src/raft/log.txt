@@ -1,0 +1,94 @@
+2022/06/01 13:03:52 raft.go:430: server id:0	,role: 2,term :0 ,votedFor:-1
+2022/06/01 13:03:52 raft.go:430: server id:1	,role: 2,term :0 ,votedFor:-1
+2022/06/01 13:03:52 raft.go:430: server id:2	,role: 2,term :0 ,votedFor:-1
+2022/06/01 13:03:52 raft_election.go:146: become leader, id:0, term:1, time:352.6289ms
+2022/06/01 13:03:52 raft.go:219: rf.id is0,rf.log length is 1
+2022/06/01 13:03:52 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:-1,log length:1,time:453.3549ms
+2022/06/01 13:03:52 raft_append_entry.go:95: dealing append entries server id:1, log start:-1,log len:1,success:true,time:453.3549ms
+2022/06/01 13:03:52 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:-1,log length:1,time:453.3549ms
+2022/06/01 13:03:52 raft_append_entry.go:95: dealing append entries server id:2, log start:-1,log len:1,success:true,time:454.3541ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:553.6321ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:553.6321ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:553.6321ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:553.6321ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:655.1075ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:655.1075ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:655.1075ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:655.1075ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:756.8981ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:756.8981ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:756.8981ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:756.8981ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:857.4056ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:857.4056ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:857.4056ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:857.4056ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:957.6674ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:957.6674ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:957.6674ms
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:957.6674ms
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.058691s
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.058691s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.058691s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.058691s
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.1591256s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.1591256s
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.1591256s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.1591256s
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.2592292s
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.2592292s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.2592292s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.2592292s
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.359589s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.359589s
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.359589s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.359589s
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.4603189s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.4603189s
+2022/06/01 13:03:53 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.4603189s
+2022/06/01 13:03:53 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.4603189s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.5603467s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.5603467s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.5603467s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.5603467s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.6620875s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.6620875s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.6620875s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.6620875s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.7625316s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.7625316s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.7625316s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.7625316s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.8640074s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.8640074s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.8640074s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.8640074s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:1.9654612s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:1.9654612s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:1.9654612s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:1.9654612s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:2.0665116s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:2.0665116s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:2.0665116s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:2.0665116s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:2.166956s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:2.166956s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:2.166956s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:2.166956s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:2.2677005s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:2.2677005s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:2.2677005s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:2.2677005s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:2,log start:0,log length:0,time:2.3684368s
+2022/06/01 13:03:54 raft_append_entry.go:118: leader append entries server id:0, term:1 ,target idx:1,log start:0,log length:0,time:2.3684368s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:1, log start:0,log len:0,success:true,time:2.3684368s
+2022/06/01 13:03:54 raft_append_entry.go:95: dealing append entries server id:2, log start:0,log len:0,success:true,time:2.3684368s
+2022/06/01 13:03:54 raft.go:251: killed: server id:0,log length:1,commitIdx:0
+2022/06/01 13:03:54 raft.go:251: killed: server id:1,log length:1,commitIdx:0
+2022/06/01 13:03:54 raft.go:251: killed: server id:2,log length:1,commitIdx:0
+append_entry.go:95: dealing append entries server id:0, log start:1,log len:0,success:true,time:2.3208839s
+2022/06/01 12:55:24 raft_append_entry.go:118: leader append entries server id:2, term:1 ,target idx:1,log start:1,log length:0,time:2.3208839s
+2022/06/01 12:55:24 raft_append_entry.go:95: dealing append entries server id:1, log start:1,log len:0,success:true,time:2.3216989s
+2022/06/01 12:55:24 raft.go:251: killed: server id:0,log length:2,commitIdx:1
+2022/06/01 12:55:24 raft.go:251: killed: server id:1,log length:2,commitIdx:1
+2022/06/01 12:55:24 raft.go:251: killed: server id:2,log length:2,commitIdx:1

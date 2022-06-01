@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -84,7 +83,7 @@ func (rf *Raft) startElection() {
 	//解决死锁：减小粒度
 	rf.lock("startElection")
 	rf.changeRole(Candidate)
-	log.Printf("start election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+	//log.Printf("start election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 
 	//是否需要defer?
 	//defer rf.resetElectionTimer()
@@ -115,10 +114,10 @@ func (rf *Raft) startElection() {
 			//fmt.Printf("self-id:%d,target-id:%d,flag:%t\n",rf.me,idx,flag)
 			//network failure
 			if !flag {
-				log.Printf("not receive vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
+				//log.Printf("not receive vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
 				replys=append(replys, reqReply)
 			}else {
-				log.Printf("received vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
+				//log.Printf("received vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
 				replys=append(replys, reqReply)
 			}
 			wg.Done()
@@ -147,7 +146,7 @@ func (rf *Raft) startElection() {
 		log.Printf("become leader, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.changeRole(Leader)
 	}else {
-		log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+		//log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.resetElectionTimer()
 	}
 	//log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
@@ -186,7 +185,7 @@ func (rf *Raft) startElection() {
 //
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool{
 	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut*time.Millisecond)
-	now:=time.Now()
+	//now:=time.Now()
 	defer toleranceTimer.Stop()
 	boolchan:=make(chan bool)
 	go func() {
@@ -196,7 +195,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 				boolchan<-false
 			}
 			case <-toleranceTimer.C:{
-				fmt.Printf("tolerance time:%v\n",time.Now().Sub(now))
+				//fmt.Printf("tolerance time:%v\n",time.Now().Sub(now))
 				boolchan<-false
 			}
 			default:
