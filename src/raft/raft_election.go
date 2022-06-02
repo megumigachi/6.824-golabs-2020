@@ -83,7 +83,7 @@ func (rf *Raft) startElection() {
 	//解决死锁：减小粒度
 	rf.lock("startElection")
 	rf.changeRole(Candidate)
-	//log.Printf("start election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+	log.Printf("start election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 
 	//是否需要defer?
 	//defer rf.resetElectionTimer()
@@ -125,9 +125,16 @@ func (rf *Raft) startElection() {
 	}
 	wg.Wait()
 
-
+	//如果直接进入这段代码，存在隐患，有锁-无锁-有锁 。
+	//问题是，如果无锁的一段中raft 收到了term更高的 信息，从而变成了Follower怎么办？
+	//所以判断第三段中的身份，如果变换则废弃处理
 	rf.lock("startElection_dealing_result")
 	defer rf.unlock("startElection_dealing_result")
+
+	if rf.role!=Candidate {
+		log.Printf("role changing while election ,id :%d",rf.me)
+		return
+	}
 
 	for _,reply:=range(replys)  {
 		if reply.VoteGranted{
@@ -135,7 +142,7 @@ func (rf *Raft) startElection() {
 		}else {
 			if reply.Term>rf.currentTerm {
 				rf.changeRole(Follower)
-				log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+				//log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 				return
 			}
 		}
@@ -183,6 +190,7 @@ func (rf *Raft) startElection() {
 // that the caller passes the address of the reply struct with &, not
 // the struct itself.
 //
+//无锁方法，但是不涉及rf字段
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool{
 	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut*time.Millisecond)
 	//now:=time.Now()

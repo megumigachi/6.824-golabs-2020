@@ -9,6 +9,7 @@ package raft
 //
 
 import (
+	"log"
 	"testing"
 )
 import "fmt"
@@ -80,7 +81,10 @@ func TestReElection2A(t *testing.T) {
 	cfg.disconnect(leader2)
 	cfg.disconnect((leader2 + 1) % servers)
 	time.Sleep(2 * RaftElectionTimeout)
+	//fmt.Println("here")
+
 	cfg.checkNoLeader()
+	//fmt.Println("here1")
 
 	// if a quorum arises, it should elect a leader.
 	cfg.connect((leader2 + 1) % servers)
@@ -92,7 +96,6 @@ func TestReElection2A(t *testing.T) {
 
 	cfg.end()
 }
-
 func TestBasicAgree2B(t *testing.T) {
 	servers := 3
 	cfg := make_config(t, servers, false)
@@ -108,6 +111,7 @@ func TestBasicAgree2B(t *testing.T) {
 		}
 
 		xindex := cfg.one(index*100, servers, false)
+
 		if xindex != index {
 			t.Fatalf("got index %v but expected %v", xindex, index)
 		}
@@ -162,6 +166,8 @@ func TestFailAgree2B(t *testing.T) {
 
 	// disconnect one follower from the network.
 	leader := cfg.checkOneLeader()
+
+	log.Printf("disconnect server id : %d\n",(leader + 1) % servers)
 	cfg.disconnect((leader + 1) % servers)
 
 	// the leader and remaining follower should be
@@ -423,6 +429,8 @@ func TestBackup2B(t *testing.T) {
 		cfg.rafts[leader2].Start(rand.Int())
 	}
 
+	fmt.Println("here")
+
 	time.Sleep(RaftElectionTimeout / 2)
 
 	// bring original leader back to life,
@@ -437,7 +445,7 @@ func TestBackup2B(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		cfg.one(rand.Int(), 3, true)
 	}
-
+	fmt.Println("here1")
 	// now everyone
 	for i := 0; i < servers; i++ {
 		cfg.connect(i)

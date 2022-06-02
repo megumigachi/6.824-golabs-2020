@@ -8,6 +8,10 @@ import (
 //log format & file
 func init() {
 	file := "./" + "log" + ".txt"
+	err:=os.Remove(file)
+	if err!=nil {
+		panic(err)
+	}
 	logFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0766)
 	if err != nil {
 		panic(err)

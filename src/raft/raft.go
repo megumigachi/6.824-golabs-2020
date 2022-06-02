@@ -62,6 +62,7 @@ const (
 	ElectionTimeout=300
 	HeartBeatTimeOut=100
 	RpcToleranceTimeOut=100
+	ApplyTimeOut=50
 )
 
 type Raft struct {
@@ -70,6 +71,8 @@ type Raft struct {
 	persister *Persister          // Object to hold this peer's persisted state
 	me        int                 // this peer's index into peers[]
 	dead      int32               // set by Kill()
+
+	applyCh chan ApplyMsg
 
 	role     int
 	lockName string
@@ -89,15 +92,15 @@ type Raft struct {
 	nextIndex     []int
 	matchedIndex  []int
 
-	//other
+	//except leader
 	electionTimer *time.Timer
 
 	//leader
 	//heartBeatTimer *time.Timer
 	appendEntriesTimers []*time.Timer
 
-	//
-	debugTimer *time.Timer
+	//for all servers , apply log entries periodically
+	applyTimer *time.Timer
 
 
 	//for debug
@@ -216,7 +219,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		newLog.Term=rf.currentTerm
 		newLog.Command=command
 		rf.log=append(rf.log, newLog)
-		log.Printf("rf.id is%d,rf.log length is %d", rf.me,len(rf.log))
+		log.Printf("start agreement: rf.id is%d,rf.log length is %d,return index:%d", rf.me,len(rf.log),index+1)
 		//对于每一个server立即发送一条append entry 请求
 		for i:=0;i<rf.me;i++ {
 			if rf.me==i{
@@ -260,10 +263,10 @@ func (rf *Raft) killed() bool {
 func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
 
 	log:=rf.log
-	if len(log)==0 {
-		return -1,0
-	}
-	return len(log),log[len(log)-1].Term
+	//if len(log)==0 {
+	//	return -1,0
+	//}
+	return len(log)-1,log[len(log)-1].Term
 }
 
 func (rf* Raft) changeRole(role int)  {
@@ -332,7 +335,29 @@ func (rf *Raft) initLeaderProperties() {
 	idx,_:=rf.getLastLogIdxAndTerm()
 	for i:=0;i< len(rf.nextIndex);i++  {
 		rf.nextIndex[i]=idx+1
-		rf.matchedIndex[i]=-1
+		rf.matchedIndex[i]=0
+	}
+}
+
+func (rf *Raft) applyLogs() {
+	rf.lock("apply logs")
+	defer rf.unlock("apply logs")
+	rf.applyTimer.Reset(ApplyTimeOut*time.Millisecond)
+	if rf.lastApplied>rf.commitIndex {
+		panic("apply an uncommitted index ")
+	}else if rf.lastApplied==rf.commitIndex{
+		return
+	}else {
+		rf.lastApplied++
+		index:=rf.lastApplied
+		command:=rf.log[index].Command
+		applymsg := ApplyMsg{
+			true,
+			command,
+			index,
+		}
+		log.Printf("server id:%d ,apply log id:%d",rf.me,index)
+		rf.applyCh<-applymsg
 	}
 }
 
@@ -356,10 +381,29 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
+	rf.applyCh=applyCh
 	rf.startTime=time.Now()
-	rf.currentTerm=0
+
 	rf.role=-1
 	rf.stopSignal=make(chan int)
+
+	//todo persist
+	rf.currentTerm=0
+	rf.voteFor=-1
+	rf.log=make([]Log,0)
+	//初始化填充
+	if len(rf.log)==0 {
+		rf.log=append(rf.log,Log{
+			Term:    0,
+			Index:   0,
+			Command: nil,
+		})
+	}
+
+	//volatile properties
+	rf.commitIndex=0
+	rf.lastApplied=0
+
 
 	rf.electionTimer=time.NewTimer(time.Duration(me+ElectionTimeout)*time.Millisecond)
 	rf.appendEntriesTimers=make([]*time.Timer, len(peers))
@@ -369,12 +413,15 @@ func Make(peers []*labrpc.ClientEnd, me int,
 		}
 		rf.appendEntriesTimers[i]=time.NewTimer(HeartBeatTimeOut*time.Millisecond)
 	}
+	rf.applyTimer=time.NewTimer(ApplyTimeOut*time.Millisecond)
+
+	//todo:这里需要修改，因为在重启的时候可能会重新读取某些属性（如votefor）而不会按照这个逻辑
 	rf.changeRole(Follower)
 	//用来人造bug
 	//rf.electionTimer.Reset(time.Duration(me+ElectionTimeout)*time.Millisecond)
 	//rf.electionTimer.Stop()
-	rf.voteFor=-1
-	rf.log=make([]Log,0)
+
+
 
 
 	// election listener
@@ -413,7 +460,17 @@ func Make(peers []*labrpc.ClientEnd, me int,
 		}()
 	}
 
-
+	//applying message
+	go func() {
+		for  {
+			select {
+				case <-rf.stopSignal:
+					return
+				case <-rf.applyTimer.C:
+					rf.applyLogs()
+			}
+		}
+	}()
 
 	//debug : watching lockName
 	//go func() {
