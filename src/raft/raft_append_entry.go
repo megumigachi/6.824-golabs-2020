@@ -99,6 +99,11 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 	rf.lock("appendEntries")
+	//也许是记录中的timer bug所导致，只能验证当前角色，不是leader则丢弃这次操作（很不优雅的实现，也许教授说的对，真的应该抛弃leader）
+	if rf.role!=Leader{
+		rf.unlock("appendEntries")
+		return false
+	}
 	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut*time.Millisecond)
 	defer toleranceTimer.Stop()
 	args:=&AppendEntriesArgs{}
@@ -115,7 +120,7 @@ func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 		args.PrevLogTerm=0
 	}
 
-	log.Printf("leader append entries server id:%d, term:%d ,target idx:%d,log start:%d,log length:%d,time:%v\n",rf.me,rf.currentTerm,idx,args.PrevLogIndex,len(args.Entries),time.Now().Sub(rf.startTime))
+	log.Printf("leader append entries server id:%d,role:%d, term:%d ,target idx:%d,log start:%d,log length:%d,time:%v\n",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex,len(args.Entries),time.Now().Sub(rf.startTime))
 	rf.appendEntriesTimers[idx].Reset(HeartBeatTimeOut*time.Millisecond)
 	rf.unlock("appendEntries")
 
@@ -157,7 +162,7 @@ func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 							//target server refuse logs, reduce log idx
 							log.Printf("target server refuse logs,target id:%d,reply term:%d,\n",idx,reply.Term)
 							rf.nextIndex[idx]--;
-							rf.appendEntriesTimers[idx].Reset(5*time.Millisecond)
+							rf.appendEntriesTimers[idx].Reset(0)
 						}
 					}else {
 						nextidx:=rf.nextIndex[idx]+ len(args.Entries)
