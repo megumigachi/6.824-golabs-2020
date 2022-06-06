@@ -50,6 +50,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		if rf.currentTerm<reqTerm {
 			rf.currentTerm=reqTerm
 			rf.voteFor=-1
+			rf.persist()
 			rf.changeRole(Follower)
 		}
 
@@ -64,6 +65,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 				return
 			}else {
 				rf.voteFor=args.CandidateId
+				rf.persist()
 				reply.VoteGranted=true
 				rf.resetElectionTimer()
 				return

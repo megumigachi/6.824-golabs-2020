@@ -26,6 +26,7 @@ type AppendEntriesArgs struct {
 type AppendEntriesReply struct {
 	Term int
 	Success bool
+	NextIndex int
 }
 
 //when appending logs to server idx , get them
@@ -64,15 +65,29 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	prevLogidx:=args.PrevLogIndex
 	if prevLogidx>= len(rf.log) {
 		log.Printf("dealing append entries fail1 server id:%d, log start:%d,log len:%d,success:%v,rf log len:%d,time:%v\n",rf.me,args.PrevLogIndex,len(args.Entries),reply.Success, len(rf.log),time.Now().Sub(rf.startTime))
+		reply.NextIndex=len(rf.log)
+		//reply.NextIndex=prevLogidx
 		return
 	}
 	if prevLogidx!=0&&rf.log[prevLogidx].Term!=args.PrevLogTerm {
 		log.Printf("dealing append entries fail2 server id:%d, log start:%d,log len:%d,success:%v,time:%v\n",rf.me,args.PrevLogIndex,len(args.Entries),reply.Success,time.Now().Sub(rf.startTime))
-
+		if rf.log[prevLogidx].Term>args.PrevLogIndex {
+			//skip a term
+			for i:=prevLogidx;i>=0 ;i--  {
+				if rf.log[i].Term<rf.log[prevLogidx].Term {
+					reply.NextIndex=i+1
+					break
+				}
+			}
+		}else {
+			reply.NextIndex=prevLogidx
+		}
+		reply.NextIndex=prevLogidx
 		return
 	}
 
 	reply.Success=true
+	reply.NextIndex=-1
 
 	if rf.role==Follower {
 		rf.electionTimer.Reset(ElectionTimeout*time.Millisecond)
@@ -81,7 +96,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	//condition3,4
 	rf.log=rf.log[:prevLogidx+1]
 	rf.log=append(rf.log,args.Entries...)
-
+	rf.persist()
 	//condition5
 	leadercommit:=args.LeaderCommit
 	theLastEntryIdx:= len(rf.log)-1
@@ -156,12 +171,14 @@ func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 						if term>rf.currentTerm {
 							log.Printf("term less than target,turn to follower\n")
 							rf.currentTerm=term
+							rf.persist()
 							rf.changeRole(Follower)
 							//return ok
 						}else {
 							//target server refuse logs, reduce log idx
 							log.Printf("target server refuse logs,target id:%d,reply term:%d,\n",idx,reply.Term)
-							rf.nextIndex[idx]--;
+							//rf.nextIndex[idx]--;
+							rf.nextIndex[idx]=reply.NextIndex
 							rf.appendEntriesTimers[idx].Reset(0)
 						}
 					}else {

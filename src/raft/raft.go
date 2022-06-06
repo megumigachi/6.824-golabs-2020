@@ -185,7 +185,8 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		newLog.Term=rf.currentTerm
 		newLog.Command=command
 		rf.log=append(rf.log, newLog)
-		log.Printf("start agreement: rf.id is%d,rf.log length is %d,return index:%d", rf.me,len(rf.log),index+1)
+		rf.persist()
+		log.Printf("start agreement: rf.id is%d,rf.log length is %d,return index:%d", rf.me,len(rf.log)-1,index+1)
 		//对于每一个server立即发送一条append entry 请求
 		for i:=0;i<rf.me;i++ {
 			if rf.me==i{
@@ -217,7 +218,7 @@ func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
 	close(rf.stopSignal)
-	log.Println(fmt.Sprintf("killed: server id:%d,log length:%d,commitIdx:%d",rf.me,len(rf.log),rf.commitIndex))
+	log.Println(fmt.Sprintf("killed: server id:%d,log length:%d,commitIdx:%d",rf.me,len(rf.log)-1,rf.commitIndex))
 
 }
 
@@ -242,6 +243,7 @@ func (rf* Raft) changeRole(role int)  {
 	if role ==Candidate {
 		rf.currentTerm++
 		rf.voteFor=rf.me
+		rf.persist()
 	}
 
 
@@ -328,7 +330,7 @@ func (rf *Raft) applyLogs() {
 }
 
 
-//
+//not concurrent-safe
 func (rf *Raft) persist() {
 	// Your code here (2C).
 	w := new(bytes.Buffer)
@@ -353,6 +355,8 @@ func (rf *Raft) readPersist(data []byte) {
 	d.Decode(&rf.currentTerm)
 	d.Decode(&rf.voteFor)
 	d.Decode(&rf.log)
+
+	log.Printf("reading persist, id is %d, currentTerm is %d, votefor:%d, log length:%d" ,rf.me,rf.currentTerm,rf.voteFor, len(rf.log)-1)
 }
 
 
@@ -380,18 +384,28 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.role=-1
 	rf.stopSignal=make(chan int)
 
+
 	//todo persist
-	rf.currentTerm=0
-	rf.voteFor=-1
-	rf.log=make([]Log,0)
-	//初始化填充
-	if len(rf.log)==0 {
-		rf.log=append(rf.log,Log{
-			Term:    0,
-			Index:   0,
-			Command: nil,
-		})
+	if persister.RaftStateSize()==0 {
+		log.Printf("init... id:%d\n",rf.me)
+		rf.currentTerm=0
+		rf.voteFor=-1
+		rf.log=make([]Log,0)
+		//初始化填充
+		if len(rf.log)==0 {
+			rf.log=append(rf.log,Log{
+				Term:    0,
+				Index:   0,
+				Command: nil,
+			})
+		}
+		rf.persist()
+	}else {
+		rf.readPersist(persister.ReadRaftState())
 	}
+
+
+
 
 	//volatile properties
 	rf.commitIndex=0
@@ -479,6 +493,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// Your initialization code here (2A, 2B, 2C).
 	log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
 	// initialize from state persisted before a crash
-	rf.readPersist(persister.ReadRaftState())
+
 	return rf
 }
