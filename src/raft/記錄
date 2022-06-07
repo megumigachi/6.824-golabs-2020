@@ -6,4 +6,34 @@
 2022/05/27 09:32:43 raft_election.go:141: become leader, id:2, term:2, time:302.75863ms
 2022/05/27 09:32:43 raft_election.go:133: lose election, id:0, term:1, time:303.14045ms
 在進行選舉的時候，2，0，1開始選舉 1 收到 2的选举消息将term置为1，然后又开始选举，此时2由于收到了1的选票成为领导
-（为什么大）
+（为什么没有变回follower？）
+将选举改成异步操作
+
+
+lose的0为什么会被锁进dealing_election_result?
+把unlock放到defer里面居然（好像）解决了这个问题，真的绷不住了，为什么阿
+
+
+2、
+2022/06/04 12:38:44 config.go:236: connect(2)
+2022/06/04 12:38:44 config.go:434: config one: 105
+2022/06/04 12:38:44 raft.go:222: start agreement: rf.id is2,rf.log length is 4,return index:3
+2022/06/04 12:38:44 raft_append_entry.go:118: leader append entries server id:2,role:0, term:2 ,target idx:1,log start:1,log length:2,time:4.420709274s
+2022/06/04 12:38:44 raft_append_entry.go:150: target id and term: 1, 3
+2022/06/04 12:38:44 raft_append_entry.go:152: term less than target,turn to follower
+2022/06/04 12:38:44 raft_append_entry.go:118: leader append entries server id:2,role:2, term:3 ,target idx:0,log start:2,log length:1,time:4.422744703s
+
+是timer的问题吗
+:还真是，timer.stop()并不会保证channel里的东西一定会被清理，这就是timer总是出错的原因，参见原文件中注释
+//To ensure the channel is empty after a call to Stop, check the
+// return value and drain the channel.
+// For example, assuming the program has not received from t.C already:
+//
+// 	if !t.Stop() {
+// 		<-t.C
+// 	}
+//
+// This cannot be done concurrent to other receives from the Timer's
+// channel.
+这个问题在timer的层面上似乎很难解决，这里的代码注释写的很明白，cannot be done concurrent ，否则会导致死锁，也许我只能在timer的callback里面
+做一个验证
