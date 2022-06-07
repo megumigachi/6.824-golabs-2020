@@ -145,7 +145,7 @@ func (rf* Raft) lock(name string){
 
 func (rf* Raft) unlock(name string){
 	defer rf.mu.Unlock()
-	//log.Printf("server id :%d,unlock from %s, lock time %v",rf.me,rf.lockName,time.Now().Sub(rf.lockTime))
+	//DPrintf("server id :%d,unlock from %s, lock time %v",rf.me,rf.lockName,time.Now().Sub(rf.lockTime))
 	rf.lockName=""
 }
 
@@ -186,7 +186,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		newLog.Command=command
 		rf.log=append(rf.log, newLog)
 		rf.persist()
-		log.Printf("start agreement: rf.id is%d,rf.log length is %d,return index:%d", rf.me,len(rf.log)-1,index+1)
+		DPrintf("start agreement: rf.id is%d,rf.log length is %d,return index:%d", rf.me,len(rf.log)-1,index+1)
 		//对于每一个server立即发送一条append entry 请求
 		for i:=0;i<rf.me;i++ {
 			if rf.me==i{
@@ -237,7 +237,7 @@ func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
 }
 
 func (rf* Raft) changeRole(role int)  {
-	//log.Printf("change role: serverid: %d,changerole %d, time:%v \n",rf.me,role,rf.getTimeLine())
+	//DPrintf("change role: serverid: %d,changerole %d, time:%v \n",rf.me,role,rf.getTimeLine())
 
 	// prepare for election
 	if role ==Candidate {
@@ -288,7 +288,7 @@ func (rf* Raft) changeRole(role int)  {
 
 func (rf *Raft) reportState() {
 	if Debug>0{
-		log.Printf("id:%d  role:%d  lockname:%s",rf.me,rf.role,rf.lockName)
+		DPrintf("id:%d  role:%d  lockname:%s",rf.me,rf.role,rf.lockName)
 	}
 }
 
@@ -324,7 +324,7 @@ func (rf *Raft) applyLogs() {
 			command,
 			index,
 		}
-		log.Printf("server id:%d ,apply log id:%d",rf.me,index)
+		DPrintf("server id:%d ,apply log id:%d",rf.me,index)
 		rf.applyCh<-applymsg
 	}
 }
@@ -356,7 +356,7 @@ func (rf *Raft) readPersist(data []byte) {
 	d.Decode(&rf.voteFor)
 	d.Decode(&rf.log)
 
-	log.Printf("reading persist, id is %d, currentTerm is %d, votefor:%d, log length:%d" ,rf.me,rf.currentTerm,rf.voteFor, len(rf.log)-1)
+	DPrintf("reading persist, id is %d, currentTerm is %d, votefor:%d, log length:%d" ,rf.me,rf.currentTerm,rf.voteFor, len(rf.log)-1)
 }
 
 
@@ -387,7 +387,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	//todo persist
 	if persister.RaftStateSize()==0 {
-		log.Printf("init... id:%d\n",rf.me)
+		DPrintf("init... id:%d\n",rf.me)
 		rf.currentTerm=0
 		rf.voteFor=-1
 		rf.log=make([]Log,0)
@@ -454,7 +454,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 			continue
 		}
 		go func() {
-			//log.Printf("i=%d",idx)
+			//DPrintf("i=%d",idx)
 			for   {
 				select {
 					case <-rf.stopSignal:

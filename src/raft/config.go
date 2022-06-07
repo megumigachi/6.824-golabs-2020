@@ -97,7 +97,7 @@ func make_config(t *testing.T, n int, unreliable bool) *config {
 
 // shut down a Raft server but save its persistent state.
 func (cfg *config) crash1(i int) {
-	log.Printf("crash(%d)\n",i)
+	DPrintf("crash(%d)\n",i)
 	cfg.disconnect(i)
 	cfg.net.DeleteServer(i) // disable client connections to the server.
 
@@ -135,7 +135,7 @@ func (cfg *config) crash1(i int) {
 // this server. since we cannot really kill it.
 //
 func (cfg *config) start1(i int) {
-	log.Printf("start1(%d)\n",i)
+	DPrintf("start1(%d)\n",i)
 	cfg.crash1(i)
 
 	// a fresh set of outgoing ClientEnd names.
@@ -235,7 +235,7 @@ func (cfg *config) cleanup() {
 
 // attach server i to the net.
 func (cfg *config) connect(i int) {
-	log.Printf("connect(%d)\n", i)
+	DPrintf("connect(%d)\n", i)
 
 	cfg.connected[i] = true
 
@@ -258,7 +258,7 @@ func (cfg *config) connect(i int) {
 
 // detach server i from the net.
 func (cfg *config) disconnect(i int) {
-	log.Printf("disconnect(%d)\n", i)
+	DPrintf("disconnect(%d)\n", i)
 
 	cfg.connected[i] = false
 
@@ -433,7 +433,7 @@ func (cfg *config) wait(index int, n int, startTerm int) interface{} {
 // if retry==false, calls Start() only once, in order
 // to simplify the early Lab 2B tests.
 func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
-	log.Printf("config one: %v",cmd)
+	DPrintf("config one: %v",cmd)
 	t0 := time.Now()
 	starts := 0
 	for time.Since(t0).Seconds() < 10 {

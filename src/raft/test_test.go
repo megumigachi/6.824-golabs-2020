@@ -802,6 +802,7 @@ func TestFigure8Unreliable2C(t *testing.T) {
 			}
 		}
 
+		//10%的概率sleep(0-500)ms,90% sleep (0-13)ms
 		if (rand.Int() % 1000) < 100 {
 			ms := rand.Int63() % (int64(RaftElectionTimeout/time.Millisecond) / 2)
 			time.Sleep(time.Duration(ms) * time.Millisecond)
@@ -810,11 +811,13 @@ func TestFigure8Unreliable2C(t *testing.T) {
 			time.Sleep(time.Duration(ms) * time.Millisecond)
 		}
 
-		if leader != -1 && (rand.Int()%1000) < int(RaftElectionTimeout/time.Millisecond)/2 {
+		// 1/2概率挂掉领导
+		if leader != -1 && (rand.Int()%1000) < int(RaftElectionTimeout/time.Millisecond)/100000 {
 			cfg.disconnect(leader)
 			nup -= 1
 		}
 
+		//如果少于三个，随机重连一个
 		if nup < 3 {
 			s := rand.Int() % servers
 			if cfg.connected[s] == false {
@@ -824,6 +827,7 @@ func TestFigure8Unreliable2C(t *testing.T) {
 		}
 	}
 
+	//最后全体重连，再来一个日志
 	for i := 0; i < servers; i++ {
 		if cfg.connected[i] == false {
 			cfg.connect(i)
