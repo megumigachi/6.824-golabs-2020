@@ -7,3 +7,13 @@
 2022/05/27 09:32:43 raft_election.go:133: lose election, id:0, term:1, time:303.14045ms
 在進行選舉的時候，2，0，1開始選舉 1 收到 2的选举消息将term置为1，然后又开始选举，此时2由于收到了1的选票成为领导
 （为什么大）
+
+2022/06/07 07:28:00 util.go:30: server id:2 ,apply log id:16
+2022/06/07 07:28:00 util.go:30: server id:3 ,apply log id:208
+2022/06/07 07:28:00 util.go:30: server id:4 ,apply log id:185
+2022/06/07 07:28:00 util.go:30: server id:3 ,apply log id:209
+2022/06/07 07:28:00 util.go:30: server id:2 ,apply log id:17
+2022/06/07 07:28:00 util.go:30: server id:4 ,apply log id:186
+2022/06/07 07:28:00 util.go:30: server id:3 ,apply log id:210
+2022/06/07 07:28:00 util.go:30: server id:2 ,apply log id:18
+从这段日志中可以看出apply log是一个一个的，很有问题

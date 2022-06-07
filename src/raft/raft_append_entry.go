@@ -223,8 +223,9 @@ func (rf *Raft) updateCommitIndex() {
 
 	sort.Ints(temp)
 	//4:1;5:2
+	//matchedindex中位数，如果term=本期term 则可以提交，如果term小于本期term则不更新（因为考虑到term一定递增，前面也不可能有符合的出现）
 	median:=temp[(len(rf.peers)-1)/2]
-	if median>rf.commitIndex {
+	if median>rf.commitIndex&& rf.log[median].Term==rf.currentTerm{
 		rf.commitIndex=median
 	}
 }

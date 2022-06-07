@@ -18,13 +18,13 @@ package raft
 //
 
 import (
+	"../labgob"
 	"bytes"
 	"fmt"
 	"log"
 	"math/rand"
 	"sync"
 	"time"
-	"../labgob"
 )
 import "sync/atomic"
 import "../labrpc"
@@ -64,7 +64,7 @@ const (
 	ElectionTimeout=300
 	HeartBeatTimeOut=100
 	RpcToleranceTimeOut=100
-	ApplyTimeOut=50
+	ApplyTimeOut=100
 )
 
 type Raft struct {
@@ -316,16 +316,20 @@ func (rf *Raft) applyLogs() {
 	}else if rf.lastApplied==rf.commitIndex{
 		return
 	}else {
-		rf.lastApplied++
-		index:=rf.lastApplied
-		command:=rf.log[index].Command
-		applymsg := ApplyMsg{
-			true,
-			command,
-			index,
+		DPrintf("apply logs, server id:%d ,from:%d , to %d",rf.me,rf.lastApplied+1,rf.commitIndex)
+		for rf.lastApplied<rf.commitIndex  {
+			rf.lastApplied++
+			index:=rf.lastApplied
+			command:=rf.log[index].Command
+			applymsg := ApplyMsg{
+				true,
+				command,
+				index,
+			}
+			DPrintf("server id:%d ,apply log id:%d",rf.me,index)
+			rf.applyCh<-applymsg
 		}
-		DPrintf("server id:%d ,apply log id:%d",rf.me,index)
-		rf.applyCh<-applymsg
+
 	}
 }
 

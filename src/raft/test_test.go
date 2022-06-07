@@ -427,7 +427,7 @@ func TestBackup2B(t *testing.T) {
 		cfg.rafts[leader2].Start(rand.Int())
 	}
 
-	fmt.Println("here")
+	//fmt.Println("here")
 
 	time.Sleep(RaftElectionTimeout / 2)
 
@@ -443,7 +443,7 @@ func TestBackup2B(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		cfg.one(rand.Int(), 3, true)
 	}
-	fmt.Println("here1")
+	//fmt.Println("here1")
 	// now everyone
 	for i := 0; i < servers; i++ {
 		cfg.connect(i)
@@ -812,7 +812,7 @@ func TestFigure8Unreliable2C(t *testing.T) {
 		}
 
 		// 1/2概率挂掉领导
-		if leader != -1 && (rand.Int()%1000) < int(RaftElectionTimeout/time.Millisecond)/100000 {
+		if leader != -1 && (rand.Int()%1000) < int(RaftElectionTimeout/time.Millisecond)/2 {
 			cfg.disconnect(leader)
 			nup -= 1
 		}
@@ -859,6 +859,7 @@ func internalChurn(t *testing.T, unreliable bool) {
 		ret = nil
 		defer func() { ch <- ret }()
 		values := []int{}
+		//收到停止信号之前重复
 		for atomic.LoadInt32(&stop) == 0 {
 			x := rand.Int()
 			index := -1
@@ -876,6 +877,7 @@ func internalChurn(t *testing.T, unreliable bool) {
 					}
 				}
 			}
+			//如果成功开始agreement，则检测其是否提交，如果已提交（apply），则加入ret
 			if ok {
 				// maybe leader will commit our value, maybe not.
 				// but don't wait forever.
@@ -908,11 +910,13 @@ func internalChurn(t *testing.T, unreliable bool) {
 	}
 
 	for iters := 0; iters < 20; iters++ {
+		//20%概率随机disconnect一个server
 		if (rand.Int() % 1000) < 200 {
 			i := rand.Int() % servers
 			cfg.disconnect(i)
 		}
 
+		//50%概率恢复一个已经挂掉的server
 		if (rand.Int() % 1000) < 500 {
 			i := rand.Int() % servers
 			if cfg.rafts[i] == nil {
@@ -921,6 +925,7 @@ func internalChurn(t *testing.T, unreliable bool) {
 			cfg.connect(i)
 		}
 
+		//20%概率挂掉一个server
 		if (rand.Int() % 1000) < 200 {
 			i := rand.Int() % servers
 			if cfg.rafts[i] != nil {
@@ -928,10 +933,10 @@ func internalChurn(t *testing.T, unreliable bool) {
 			}
 		}
 
-		// Make crash/restart infrequent enough that the peers can often
-		// keep up, but not so infrequent that everything has settled
-		// down from one change to the next. Pick a value smaller than
-		// the election timeout, but not hugely smaller.
+		//Make crash/restart infrequent enough that the peers can often
+		//keep up, but not so infrequent that everything has settled
+		//down from one change to the next. Pick a value smaller than
+		//the election timeout, but not hugely smaller.
 		time.Sleep((RaftElectionTimeout * 7) / 10)
 	}
 
@@ -958,6 +963,7 @@ func internalChurn(t *testing.T, unreliable bool) {
 	time.Sleep(RaftElectionTimeout)
 
 	lastIndex := cfg.one(rand.Int(), servers, true)
+	DPrintf("lastidx:%d\n",lastIndex)
 
 	really := make([]int, lastIndex+1)
 	for index := 1; index <= lastIndex; index++ {
