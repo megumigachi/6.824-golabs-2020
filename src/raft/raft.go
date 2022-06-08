@@ -145,7 +145,9 @@ func (rf* Raft) lock(name string){
 
 func (rf* Raft) unlock(name string){
 	defer rf.mu.Unlock()
-	//DPrintf("server id :%d,unlock from %s, lock time %v",rf.me,rf.lockName,time.Now().Sub(rf.lockTime))
+	if time.Now().Sub(rf.lockTime).Milliseconds()>5 {
+		DPrintf("lock time too long: server id :%d,unlock from %s, lock time %v",rf.me,rf.lockName,time.Now().Sub(rf.lockTime))
+	}
 	rf.lockName=""
 }
 
@@ -186,7 +188,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		newLog.Command=command
 		rf.log=append(rf.log, newLog)
 		rf.persist()
-		DPrintf("start agreement: rf.id is%d,rf.log length is %d,return index:%d", rf.me,len(rf.log)-1,index+1)
+		DPrintf("start agreement: rf.id is%d,rf.log length is %d,return index:%d , command is %v , time is %v", rf.me,len(rf.log)-1,index+1,command, time.Now().Sub(rf.startTime))
 		//对于每一个server立即发送一条append entry 请求
 		for i:=0;i<rf.me;i++ {
 			if rf.me==i{
@@ -286,11 +288,7 @@ func (rf* Raft) changeRole(role int)  {
 
 }
 
-func (rf *Raft) reportState() {
-	if Debug>0{
-		DPrintf("id:%d  role:%d  lockname:%s",rf.me,rf.role,rf.lockName)
-	}
-}
+
 
 func (rf *Raft) getTimeLine() time.Duration {
 	return time.Now().Sub(rf.startTime)
@@ -316,7 +314,7 @@ func (rf *Raft) applyLogs() {
 	}else if rf.lastApplied==rf.commitIndex{
 		return
 	}else {
-		DPrintf("apply logs, server id:%d ,from:%d , to %d",rf.me,rf.lastApplied+1,rf.commitIndex)
+		DPrintf("start applying logs, server id:%d ,from:%d , to %d, time %v",rf.me,rf.lastApplied+1,rf.commitIndex,time.Now().Sub(rf.startTime))
 		for rf.lastApplied<rf.commitIndex  {
 			rf.lastApplied++
 			index:=rf.lastApplied
@@ -329,6 +327,7 @@ func (rf *Raft) applyLogs() {
 			DPrintf("server id:%d ,apply log id:%d",rf.me,index)
 			rf.applyCh<-applymsg
 		}
+		DPrintf("finish applying logs, server id:%d ,from:%d , to %d, time %v",rf.me,rf.lastApplied+1,rf.commitIndex,time.Now().Sub(rf.startTime))
 
 	}
 }
@@ -360,7 +359,13 @@ func (rf *Raft) readPersist(data []byte) {
 	d.Decode(&rf.voteFor)
 	d.Decode(&rf.log)
 
-	DPrintf("reading persist, id is %d, currentTerm is %d, votefor:%d, log length:%d" ,rf.me,rf.currentTerm,rf.voteFor, len(rf.log)-1)
+	DPrintf("reading persist, id is %d, currentTerm is %d, votefor:%d, log length:%d\n" ,rf.me,rf.currentTerm,rf.voteFor, len(rf.log)-1)
+}
+
+func (rf *Raft) printState() {
+	rf.lock("printState")
+	defer rf.unlock("printState")
+	DPrintf("printState: id=%d, term=%d, role=%d, log length:%d ,last log term:%d, commitIndex:%d\n", rf.me,rf.currentTerm,rf.role, len(rf.log)-1,rf.log[len(rf.log)-1].Term,rf.commitIndex)
 }
 
 
