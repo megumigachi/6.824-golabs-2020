@@ -307,14 +307,15 @@ func (rf *Raft) initLeaderProperties() {
 
 func (rf *Raft) applyLogs() {
 	rf.lock("apply logs")
-	defer rf.unlock("apply logs")
 	rf.applyTimer.Reset(ApplyTimeOut*time.Millisecond)
 	if rf.lastApplied>rf.commitIndex {
 		panic("apply an uncommitted index ")
 	}else if rf.lastApplied==rf.commitIndex{
+		rf.unlock("apply logs")
 		return
 	}else {
 		DPrintf("start applying logs, server id:%d ,from:%d , to %d, time %v",rf.me,rf.lastApplied+1,rf.commitIndex,time.Now().Sub(rf.startTime))
+		msgs:=make([]ApplyMsg,0)
 		for rf.lastApplied<rf.commitIndex  {
 			rf.lastApplied++
 			index:=rf.lastApplied
@@ -324,10 +325,16 @@ func (rf *Raft) applyLogs() {
 				command,
 				index,
 			}
-			DPrintf("server id:%d ,apply log id:%d",rf.me,index)
-			rf.applyCh<-applymsg
+			msgs=append(msgs,applymsg)
+			//DPrintf("server id:%d ,apply log id:%d",rf.me,index)
 		}
 		DPrintf("finish applying logs, server id:%d ,from:%d , to %d, time %v",rf.me,rf.lastApplied+1,rf.commitIndex,time.Now().Sub(rf.startTime))
+		rf.unlock("apply logs")
+		go func() {
+			for _,item:=range msgs {
+				rf.applyCh<-item
+			}
+		}()
 
 	}
 }
