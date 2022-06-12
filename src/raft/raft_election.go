@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"log"
 	"sync"
 	"time"
 )
@@ -85,7 +84,7 @@ func (rf *Raft) startElection() {
 	//解决死锁：减小粒度
 	rf.lock("startElection")
 	rf.changeRole(Candidate)
-	log.Printf("start election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+	DPrintf("start election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 
 	//是否需要defer?
 	//defer rf.resetElectionTimer()
@@ -116,10 +115,10 @@ func (rf *Raft) startElection() {
 			//fmt.Printf("self-id:%d,target-id:%d,flag:%t\n",rf.me,idx,flag)
 			//network failure
 			if !flag {
-				//log.Printf("not receive vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
+				//DPrintf("not receive vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
 				replys=append(replys, reqReply)
 			}else {
-				//log.Printf("received vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
+				//DPrintf("received vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
 				replys=append(replys, reqReply)
 			}
 			wg.Done()
@@ -134,7 +133,7 @@ func (rf *Raft) startElection() {
 	defer rf.unlock("startElection_dealing_result")
 
 	if rf.role!=Candidate {
-		log.Printf("role changing while election ,id :%d",rf.me)
+		DPrintf("role changing while election ,id :%d",rf.me)
 		return
 	}
 
@@ -144,7 +143,7 @@ func (rf *Raft) startElection() {
 		}else {
 			if reply.Term>rf.currentTerm {
 				rf.changeRole(Follower)
-				//log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+				//DPrintf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 				return
 			}
 		}
@@ -152,13 +151,13 @@ func (rf *Raft) startElection() {
 
 	if voteGathered>=len(rf.peers)/2+1 {
 		//todo: become leader
-		log.Printf("become leader, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+		DPrintf("become leader, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.changeRole(Leader)
 	}else {
-		//log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+		//DPrintf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.resetElectionTimer()
 	}
-	//log.Printf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+	//DPrintf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 
 }
 
