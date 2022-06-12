@@ -202,10 +202,11 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 			select {
 			case <-rf.stopSignal:{
 				boolchan<-false
+				return
 			}
 			case <-toleranceTimer.C:{
-				//fmt.Printf("tolerance time:%v\n",time.Now().Sub(now))
 				boolchan<-false
+				return
 			}
 			default:
 				{
@@ -229,6 +230,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 		select {
 			case ok:=<-boolchan:{
 				if !ok{
+					time.Sleep(10*time.Millisecond)
 					continue
 				}else {
 					return true
