@@ -1,14 +1,28 @@
 package kvraft
 
-import "../labrpc"
+import (
+	"../labrpc"
+	"time"
+)
 import "crypto/rand"
 import "math/big"
 
+const (
+	timeOut  =	100*time.Millisecond
+)
 
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// You will have to modify this struct.
+	clientId int64
+	commandId int
+
+	lockName string
+	//暂存的领导id
+	serverLeaderId int
 }
+
+
 
 func nrand() int64 {
 	max := big.NewInt(int64(1) << 62)
@@ -20,6 +34,9 @@ func nrand() int64 {
 func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
+	ck.clientId=nrand()
+	ck.commandId=0
+	ck.serverLeaderId=0
 	// You'll have to add code here.
 	return ck
 }
@@ -38,7 +55,44 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 //
 func (ck *Clerk) Get(key string) string {
 
-	// You will have to modify this function.
+	args:=GetArgs{
+		key,
+		ck.clientId,
+		ck.commandId,
+	}
+	reply:=GetReply{
+		Err:   "",
+		Value: "",
+	}
+	//客户端，应该不需要加锁
+	//客户端的命令是线性执行的，并发毫无意义
+	for  {
+		leaderId:=ck.serverLeaderId
+		ok:=ck.servers[leaderId].Call("KVServer.Get", &args, &reply)
+		//失败重传?
+		if !ok {
+			DPrintf("failed to call server\n")
+			//try next server
+			leaderId=(leaderId+1)% len(ck.servers)
+			time.Sleep(timeOut)
+			continue
+		}
+
+		success:=reply.Err
+
+		if success==OK {
+			ck.serverLeaderId=leaderId
+			return reply.Value
+		}else if success==ErrNoKey {
+			ck.serverLeaderId=leaderId
+			break
+		}else if success==ErrWrongLeader {
+			//try next server
+			ck.serverLeaderId=(leaderId+1)% len(ck.servers)
+			continue
+		}
+	}
+
 	return ""
 }
 
@@ -53,7 +107,7 @@ func (ck *Clerk) Get(key string) string {
 // arguments. and reply must be passed as a pointer.
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
-	// You will have to modify this function.
+	
 }
 
 func (ck *Clerk) Put(key string, value string) {

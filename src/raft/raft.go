@@ -403,7 +403,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	//todo persist
 	if persister.RaftStateSize()==0 {
-		DPrintf("init... id:%d\n",rf.me)
+		//DPrintf("init... id:%d\n",rf.me)
 		rf.currentTerm=0
 		rf.voteFor=-1
 		rf.log=make([]Log,0)
@@ -507,7 +507,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	//
 	//}()
 	// Your initialization code here (2A, 2B, 2C).
-	log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
+	//log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
 	// initialize from state persisted before a crash
 
 	return rf
