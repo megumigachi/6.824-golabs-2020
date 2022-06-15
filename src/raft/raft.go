@@ -64,7 +64,7 @@ const (
 	ElectionTimeout=300
 	HeartBeatTimeOut=100
 	RpcToleranceTimeOut=100
-	ApplyTimeOut=100
+	ApplyTimeOut=50
 )
 
 type Raft struct {
@@ -390,6 +390,7 @@ func (rf *Raft) printState() {
 //
 func Make(peers []*labrpc.ClientEnd, me int,
 	persister *Persister, applyCh chan ApplyMsg) *Raft {
+	//labgob.Register(Command{})
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister

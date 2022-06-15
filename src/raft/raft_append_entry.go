@@ -46,6 +46,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	rf.lock("dealingAppendEntries")
 	defer rf.unlock("dealingAppendEntries")
 
+	DPrintf("args:%v\n",args)
 
 	reply.Success=false
 	reply.Term=rf.currentTerm
