@@ -328,7 +328,6 @@ func (rf *Raft) applyLogs() {
 			msgs=append(msgs,applymsg)
 			//DPrintf("server id:%d ,apply log id:%d",rf.me,index)
 		}
-		DPrintf("finish applying logs, server id:%d ,from:%d , to %d, time %v",rf.me,rf.lastApplied+1,rf.commitIndex,time.Now().Sub(rf.startTime))
 		rf.unlock("apply logs")
 		go func() {
 			for _,item:=range msgs {
