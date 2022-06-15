@@ -47,6 +47,8 @@ type KVServer struct {
 	applyCh chan raft.ApplyMsg
 	dead    int32 // set by Kill()
 
+	startTime time.Time
+
 	lockName string
 
 	stateMachine StateMachine
@@ -126,10 +128,11 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		ClientId:  args.ClientId,
 		CommandId: args.CommandId,
 	}
-	DPrintf("command is %v",command)
+	DPrintf("put append command is %v server id %v time:%v",command,kv.me,time.Now().Sub(kv.startTime))
 
 	//start 本身持有锁,这里应该不需要？
 	index,_,isLeader:=kv.rf.Start(command)
+
 	if!isLeader{
 		reply.Err=ErrWrongLeader
 		return
@@ -198,6 +201,10 @@ func (kv* KVServer) unlock(){
 	kv.lockName=""
 }
 
+//func (kv *KVServer)  {
+//
+//}
+
 //无锁方法，调用外部需要加锁
 func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 	commandId:=cmd.CommandId
@@ -223,7 +230,10 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 		kv.stateMachine.Put(op.Key,op.Value)
 	}else if op.Operation==OP_Append {
 		kv.stateMachine.Append(op.Key,op.Value)
+	}else {
+
 	}
+
 	kv.resultMap[clientId]=ResponseRecord{
 		CommandId: commandId,
 		Response:  responseMsg,
@@ -266,6 +276,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.ResponseChans=make(map[int]chan ResponseMessage)
 	kv.resultMap=make(map[int64]ResponseRecord)
 
+	kv.startTime=time.Now()
 	//从applyCh中读取数据
 	go func() {
 		for m:=range kv.applyCh {

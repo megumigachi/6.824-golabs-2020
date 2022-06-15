@@ -37,6 +37,7 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck.clientId=nrand()
 	ck.commandId=0
 	ck.serverLeaderId=0
+
 	// You'll have to add code here.
 	return ck
 }
@@ -69,12 +70,14 @@ func (ck *Clerk) Get(key string) string {
 	//客户端的命令是线性执行的，并发毫无意义
 	for  {
 		leaderId:=ck.serverLeaderId
+		DPrintf("client get , client id %d, server id %d , key %v,cmd id :%v", ck.clientId,len(ck.servers)-1-leaderId,key,ck.commandId)
+
 		ok:=ck.servers[leaderId].Call("KVServer.Get", &args, &reply)
 		//失败重传?
 		if !ok {
 			DPrintf("failed to call server\n")
 			//try next server
-			leaderId=(leaderId+1)% len(ck.servers)
+			ck.serverLeaderId=(leaderId+1)% len(ck.servers)
 			time.Sleep(reRequestTimeOut)
 			continue
 		}
@@ -83,9 +86,11 @@ func (ck *Clerk) Get(key string) string {
 
 		if success==OK {
 			ck.serverLeaderId=leaderId
+			ck.commandId++
 			return reply.Value
 		}else if success==ErrNoKey {
 			ck.serverLeaderId=leaderId
+			ck.commandId++
 			break
 		}else if success==ErrWrongLeader {
 			//try next server
@@ -127,7 +132,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 
 	for  {
 		leaderId:=ck.serverLeaderId
-		DPrintf("client put append , client id %d, server id %d,op %v, key %v, value %v", ck.clientId,leaderId,op,key,value)
+		DPrintf("client put append , client id %d, server id %d,op %v, key %v, value %v , commandid %v", ck.clientId,len(ck.servers)-1-leaderId,op,key,value,ck.commandId)
 		ok:=ck.servers[leaderId].Call("KVServer.PutAppend", &args, &reply)
 
 		if !ok {
@@ -137,12 +142,14 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		}
 
 		err:=reply.Err
+		DPrintf("client put append result , client id %d, server id %d, command id %v, result %v", ck.clientId,len(ck.servers)-1-leaderId,ck.commandId,err)
 		if err==ErrWrongLeader {
 			time.Sleep(reRequestTimeOut)
 			ck.serverLeaderId=(leaderId+1)%len(ck.servers)
 			continue
 		}else if err==OK{
 			ck.serverLeaderId=leaderId
+			ck.commandId++
 			break
 		}else {
 			time.Sleep(reRequestTimeOut)
