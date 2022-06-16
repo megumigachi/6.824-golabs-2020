@@ -102,6 +102,7 @@ func (rf *Raft) startElection() {
 	voteGathered:=1
 	//gather voteReplys
 	replys:=make([]*RequestVoteReply,0)
+	var replyMu sync.Mutex
 	for i:=0;i< len(rf.peers);i++  {
 		idx:=i
 		reqReply:=&RequestVoteReply{}
@@ -109,17 +110,24 @@ func (rf *Raft) startElection() {
 		if idx==rf.me {
 			continue
 		}
+
 		wg.Add(1)
 		go func() {
 			flag:=rf.sendRequestVote(idx,reqArg,reqReply)
 			//fmt.Printf("self-id:%d,target-id:%d,flag:%t\n",rf.me,idx,flag)
 			//network failure
 			if !flag {
+				replyMu.Lock()
 				//DPrintf("not receive vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
 				replys=append(replys, reqReply)
+				replyMu.Unlock()
+
 			}else {
+				replyMu.Lock()
 				//DPrintf("received vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
 				replys=append(replys, reqReply)
+				replyMu.Unlock()
+
 			}
 			wg.Done()
 		}()

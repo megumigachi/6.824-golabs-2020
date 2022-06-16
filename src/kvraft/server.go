@@ -306,13 +306,13 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 
 
 	//check deadlock
-	go func() {
-		for  {
-			time.Sleep(5*time.Second)
-			DPrintf(" server id %d , lockName %v", kv.me, kv.lockName)
-		}
-
-	}()
+	//go func() {
+	//	for  {
+	//		time.Sleep(5*time.Second)
+	//		DPrintf(" server id %d , lockName %v", kv.me, kv.lockName)
+	//	}
+	//
+	//}()
 
 	return kv
 }
