@@ -1,0 +1,28 @@
+reply:=PutAppendReply{Err:""}
+
+for  {
+    leaderId:=ck.serverLeaderId
+    ok:=ck.servers[leaderId].Call("KVServer.PutAppend", &args, &reply)
+
+    if !ok {
+        time.Sleep(reRequestTimeOut)
+        ck.serverLeaderId=(leaderId+1)%len(ck.servers)
+        continue
+    }
+
+    err:=reply.Err
+    //DPrintf("client put append result , client id %d,  command id %v, result %v time %v", ck.clientId,ck.commandId,err,time.Now().Sub(ck.startTime))
+    if err==ErrWrongLeader {
+        time.Sleep(reRequestTimeOut)
+        ck.serverLeaderId=(leaderId+1)%len(ck.servers)
+        continue
+    }else if err==OK{
+        ck.serverLeaderId=leaderId
+        ck.commandId++
+        break
+    }else {
+        time.Sleep(reRequestTimeOut)
+        ck.serverLeaderId=(leaderId+1)%len(ck.servers)
+        continue
+    }
+}

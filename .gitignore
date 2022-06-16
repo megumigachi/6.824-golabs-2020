@@ -1,0 +1,9 @@
+
+src/raft/gotest.bat.bak
+*.bat
+src/raft/log.txt
+src/raft/log.txt
+src/raft/log.txt
+src/kvraft/log.txt
+src/raft/log.txt
+src/raft/result.txt

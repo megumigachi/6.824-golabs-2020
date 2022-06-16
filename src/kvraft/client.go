@@ -8,7 +8,7 @@ import "crypto/rand"
 import "math/big"
 
 const (
-	reRequestTimeOut =	100*time.Millisecond
+	reRequestTimeOut =	20*time.Millisecond
 )
 
 type Clerk struct {
@@ -20,6 +20,8 @@ type Clerk struct {
 	lockName string
 	//暂存的领导id
 	serverLeaderId int
+
+	startTime time.Time
 }
 
 
@@ -37,6 +39,7 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck.clientId=nrand()
 	ck.commandId=0
 	ck.serverLeaderId=0
+	ck.startTime=time.Now()
 
 	// You'll have to add code here.
 	return ck
@@ -62,15 +65,16 @@ func (ck *Clerk) Get(key string) string {
 		ck.clientId,
 		ck.commandId,
 	}
-	reply:=GetReply{
-		Err:   "",
-		Value: "",
-	}
+
 	//客户端，应该不需要加锁
 	//客户端的命令是线性执行的，并发毫无意义
 	for  {
+		reply:=GetReply{
+			Err:   "",
+			Value: "",
+		}
 		leaderId:=ck.serverLeaderId
-		DPrintf("client get , client id %d, server id %d , key %v,cmd id :%v", ck.clientId,len(ck.servers)-1-leaderId,key,ck.commandId)
+		DPrintf("client get , client id %d , key %v,cmd id :%v", ck.clientId,key,ck.commandId)
 
 		ok:=ck.servers[leaderId].Call("KVServer.Get", &args, &reply)
 		//失败重传?
@@ -128,11 +132,12 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		CommandId: ck.commandId,
 	}
 
-	reply:=PutAppendReply{Err:""}
 
 	for  {
+		reply:=PutAppendReply{Err:""}
+
 		leaderId:=ck.serverLeaderId
-		DPrintf("client put append , client id %d, server id %d,op %v, key %v, value %v , commandid %v", ck.clientId,len(ck.servers)-1-leaderId,op,key,value,ck.commandId)
+		DPrintf("client put append , client id %d, op %v, key %v, value %v , commandid %v time %v", ck.clientId,op,key,value,ck.commandId,time.Now().Sub(ck.startTime))
 		ok:=ck.servers[leaderId].Call("KVServer.PutAppend", &args, &reply)
 
 		if !ok {
@@ -142,7 +147,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		}
 
 		err:=reply.Err
-		DPrintf("client put append result , client id %d, server id %d, command id %v, result %v", ck.clientId,len(ck.servers)-1-leaderId,ck.commandId,err)
+		DPrintf("client put append result , client id %d,  command id %v, result %v time %v", ck.clientId,ck.commandId,err,time.Now().Sub(ck.startTime))
 		if err==ErrWrongLeader {
 			time.Sleep(reRequestTimeOut)
 			ck.serverLeaderId=(leaderId+1)%len(ck.servers)

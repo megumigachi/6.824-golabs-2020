@@ -86,9 +86,9 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 		return
 	}
 
-	kv.mu.Lock()
+	kv.lock("generateResponse")
 	ch:=kv.generateResponseChan(index)
-	kv.mu.Unlock()
+	kv.unlock()
 
 	select {
 		case responseMsg:=<-ch:{
@@ -102,9 +102,9 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	}
 
 	go func() {
-		kv.mu.Lock()
+		kv.lock("deleteResponseChan")
 		delete(kv.ResponseChans,index)
-		kv.mu.Unlock()
+		kv.unlock()
 	}()
 
 
@@ -132,15 +132,16 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 
 	//start 本身持有锁,这里应该不需要？
 	index,_,isLeader:=kv.rf.Start(command)
+	DPrintf("server : %d ,isLeader %v , time :%v ",kv.me,isLeader,time.Now().Sub(kv.startTime))
 
 	if!isLeader{
 		reply.Err=ErrWrongLeader
 		return
 	}
 
-	kv.mu.Lock()
+	kv.lock("generateResponse")
 	ch:=kv.generateResponseChan(index)
-	kv.mu.Unlock()
+	kv.unlock()
 
 	select {
 		case responseMsg:=<-ch:{
@@ -153,9 +154,9 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	}
 
 	go func() {
-		kv.mu.Lock()
+		kv.lock("deleteResponseChan")
 		delete(kv.ResponseChans,index)
-		kv.mu.Unlock()
+		kv.unlock()
 	}()
 }
 
@@ -218,7 +219,7 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 	}
 
 	responseMsg:=ResponseMessage{
-		Err:   "",
+		Err:   OK,
 		Value: "",
 	}
 
@@ -234,6 +235,7 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 
 	}
 
+	DPrintf("execute op save result map clientId:%d , commandId: %d, response message %v",clientId,commandId,responseMsg)
 	kv.resultMap[clientId]=ResponseRecord{
 		CommandId: commandId,
 		Response:  responseMsg,
@@ -283,22 +285,33 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 			idx:=m.CommandIndex
 			command:=m.Command
 			valid:=m.CommandValid
-			DPrintf("server apply message idx:%v, command:%v",idx,command)
+			DPrintf("server id :%d , server apply message idx:%v, command:%v",kv.me,idx,command)
 			if valid {
 				//apply command to state machine and then tell notify channel if possible
 				cmd:=command.(Command)
 				kv.lock("apply operation")
 				msg:=kv.executeOperation(cmd)
-				kv.unlock()
 				if v,ok:=kv.ResponseChans[idx];ok{
 					v<-msg
 				}else {
-					DPrintf("response has been timeout\n")
+					//maybe not a leader
+					//DPrintf("response has been timeout\n")
 				}
+				kv.unlock()
 			}else {
 				//todo:invalid command?
 			}
 		}
+	}()
+
+
+	//check deadlock
+	go func() {
+		for  {
+			time.Sleep(5*time.Second)
+			DPrintf(" server id %d , lockName %v", kv.me, kv.lockName)
+		}
+
 	}()
 
 	return kv
