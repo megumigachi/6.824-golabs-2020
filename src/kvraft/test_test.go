@@ -60,10 +60,10 @@ func spawn_clients_and_wait(t *testing.T, cfg *config, ncli int, fn func(me int,
 		ca[cli] = make(chan bool)
 		go run_client(t, cfg, cli, ca[cli], fn)
 	}
-	// log.Printf("spawn_clients_and_wait: waiting for clients")
+	log.Printf("spawn_clients_and_wait: waiting for clients")
 	for cli := 0; cli < ncli; cli++ {
 		ok := <-ca[cli]
-		// log.Printf("spawn_clients_and_wait: client %d is done\n", cli)
+		log.Printf("spawn_clients_and_wait: client %d is done\n", cli)
 		if ok == false {
 			t.Fatalf("failure")
 		}
@@ -195,15 +195,20 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		log.Printf("Iteration %v\n", i)
 		atomic.StoreInt32(&done_clients, 0)
 		atomic.StoreInt32(&done_partitioner, 0)
+		//启动client 然后client完成函数fn
 		go spawn_clients_and_wait(t, cfg, nclients, func(cli int, myck *Clerk, t *testing.T) {
 			j := 0
+			//结束后发送信号
 			defer func() {
 				clnts[cli] <- j
 			}()
 			last := ""
 			key := strconv.Itoa(cli)
+			//每个clerk 调用put（自身序号,""）
 			Put(cfg, myck, key, last)
+			//当信号位没有被重置时
 			for atomic.LoadInt32(&done_clients) == 0 {
+				//50%概率新增值，50%概率检测是否正确
 				if (rand.Int() % 1000) < 500 {
 					nv := "x " + strconv.Itoa(cli) + " " + strconv.Itoa(j) + " y"
 					log.Printf("%d: client new append %v\n", cli, nv)
@@ -220,6 +225,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			}
 		})
 
+		//网络分区？
 		if partitions {
 			// Allow the clients to perform some operations without interruption
 			time.Sleep(1 * time.Second)
@@ -230,6 +236,8 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		atomic.StoreInt32(&done_clients, 1)     // tell clients to quit
 		atomic.StoreInt32(&done_partitioner, 1) // tell partitioner to quit
 
+
+		//分区则恢复, crash 则 重启
 		if partitions {
 			// log.Printf("wait for partitioner\n")
 			<-ch_partitioner
@@ -268,6 +276,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			key := strconv.Itoa(i)
 			log.Printf("Check %v for client %d\n", j, i)
 			v := Get(cfg, ck, key)
+			//大概是检查append的值是否符合规则
 			checkClntAppends(t, i, v, j)
 		}
 
@@ -335,7 +344,7 @@ func GenericTestLinearizability(t *testing.T, part string, nclients int, nserver
 		clnts[i] = make(chan int)
 	}
 	for i := 0; i < 3; i++ {
-		// log.Printf("Iteration %v\n", i)
+		log.Printf("Iteration %v\n", i)
 		atomic.StoreInt32(&done_clients, 0)
 		atomic.StoreInt32(&done_partitioner, 0)
 		go spawn_clients_and_wait(t, cfg, nclients, func(cli int, myck *Clerk, t *testing.T) {

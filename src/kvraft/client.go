@@ -8,7 +8,7 @@ import "crypto/rand"
 import "math/big"
 
 const (
-	reRequestTimeOut =	20*time.Millisecond
+	RequestIntervel =	20*time.Millisecond
 )
 
 type Clerk struct {
@@ -82,11 +82,13 @@ func (ck *Clerk) Get(key string) string {
 			DPrintf("failed to call server\n")
 			//try next server
 			ck.serverLeaderId=(leaderId+1)% len(ck.servers)
-			time.Sleep(reRequestTimeOut)
+			time.Sleep(RequestIntervel)
 			continue
 		}
 
+
 		success:=reply.Err
+		DPrintf("client get result , client id %d,  command id %v, result %v time %v", ck.clientId,ck.commandId,success,time.Now().Sub(ck.startTime))
 
 		if success==OK {
 			ck.serverLeaderId=leaderId
@@ -98,13 +100,10 @@ func (ck *Clerk) Get(key string) string {
 			break
 		}else if success==ErrWrongLeader {
 			//try next server
-			time.Sleep(reRequestTimeOut)
+			time.Sleep(RequestIntervel)
 			ck.serverLeaderId=(leaderId+1)% len(ck.servers)
 			continue
-		}else {
-			//try next server
-			time.Sleep(reRequestTimeOut)
-			ck.serverLeaderId=(leaderId+1)% len(ck.servers)
+		}else if success==ErrTimeOut{
 			continue
 		}
 	}
@@ -141,7 +140,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		ok:=ck.servers[leaderId].Call("KVServer.PutAppend", &args, &reply)
 
 		if !ok {
-			time.Sleep(reRequestTimeOut)
+			time.Sleep(RequestIntervel)
 			ck.serverLeaderId=(leaderId+1)%len(ck.servers)
 			continue
 		}
@@ -149,24 +148,22 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		err:=reply.Err
 		DPrintf("client put append result , client id %d,  command id %v, result %v time %v", ck.clientId,ck.commandId,err,time.Now().Sub(ck.startTime))
 		if err==ErrWrongLeader {
-			time.Sleep(reRequestTimeOut)
+			time.Sleep(RequestIntervel)
 			ck.serverLeaderId=(leaderId+1)%len(ck.servers)
 			continue
 		}else if err==OK{
 			ck.serverLeaderId=leaderId
 			ck.commandId++
 			break
-		}else {
-			time.Sleep(reRequestTimeOut)
-			ck.serverLeaderId=(leaderId+1)%len(ck.servers)
+		}else if err==ErrTimeOut{
 			continue
 		}
 	}
 }
 
 func (ck *Clerk) Put(key string, value string) {
-	ck.PutAppend(key, value, "Put")
+	ck.PutAppend(key, value, OP_Put)
 }
 func (ck *Clerk) Append(key string, value string) {
-	ck.PutAppend(key, value, "Append")
+	ck.PutAppend(key, value, OP_Append)
 }

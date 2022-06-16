@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const RequestTimeOut=100*time.Millisecond
+const RequestTimeOut=500*time.Millisecond
 
 const Debug = 1
 
@@ -95,7 +95,7 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 			reply.Err=responseMsg.Err
 			reply.Value=responseMsg.Value
 		}
-		case <-time.After(reRequestTimeOut):{
+		case <-time.After(RequestTimeOut):{
 			reply.Err=ErrTimeOut
 			break
 		}
@@ -147,7 +147,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		case responseMsg:=<-ch:{
 			reply.Err=responseMsg.Err
 		}
-		case <-time.After(reRequestTimeOut):{
+		case <-time.After(RequestTimeOut):{
 			reply.Err=ErrTimeOut
 			break
 		}
@@ -238,7 +238,7 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 	}else if op.Operation==OP_Append {
 		kv.stateMachine.Append(op.Key,op.Value)
 	}else {
-
+		panic("wrong op?")
 	}
 
 	DPrintf("execute op save result map clientId:%d , commandId: %d, response message %v",clientId,commandId,responseMsg)
@@ -321,13 +321,13 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 
 
 	//check deadlock
-	//go func() {
-	//	for  {
-	//		time.Sleep(2*time.Second)
-	//		DPrintf(" server id %d , lockName %v", kv.me, kv.lockName)
-	//	}
-	//
-	//}()
+	go func() {
+		for  {
+			time.Sleep(2*time.Second)
+			DPrintf(" server id %d , lockName %v", kv.me, kv.lockName)
+		}
+
+	}()
 
 	return kv
 }
