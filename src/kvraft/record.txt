@@ -1,3 +1,4 @@
+1、reply 复用的问题
 reply:=PutAppendReply{Err:""}
 
 for  {
@@ -26,3 +27,49 @@ for  {
         continue
     }
 }
+
+2、
+提交log时，产生死锁的问题
+putAppend:
+    select {
+        case responseMsg:=<-ch:{
+            reply.Err=responseMsg.Err
+        }
+        case <-time.After(reRequestTimeOut):{
+            reply.Err=ErrTimeOut
+            break
+        }
+    }
+
+    go func() {
+        kv.lock("deleteResponseChan")
+        kv.cleanAndDeleteRChan(index)
+        kv.unlock()
+    }()
+
+startKV:
+	go func() {
+		for m:=range kv.applyCh {
+			idx:=m.CommandIndex
+			command:=m.Command
+			valid:=m.CommandValid
+			DPrintf("server id :%d , server apply message idx:%v, command:%v",kv.me,idx,command)
+			if valid {
+				//apply command to state machine and then tell notify channel if possible
+				cmd:=command.(Command)
+				kv.lock("apply operation")
+				msg:=kv.executeOperation(cmd)
+				if v,ok:=kv.ResponseChans[idx];ok{
+					v<-msg
+				}else {
+					//maybe not a leader
+					//DPrintf("response has been timeout\n")
+				}
+				kv.unlock()
+			}else {
+				//todo:invalid command?
+			}
+		}
+	}()
+
+	如果在进入v<-msg之前，select语句退出,这里会造成死锁,

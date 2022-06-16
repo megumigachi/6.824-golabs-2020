@@ -155,7 +155,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 
 	go func() {
 		kv.lock("deleteResponseChan")
-		delete(kv.ResponseChans,index)
+		kv.cleanAndDeleteRChan(index)
 		kv.unlock()
 	}()
 }
@@ -183,11 +183,13 @@ func (kv *KVServer) killed() bool {
 }
 
 func (kv *KVServer) generateResponseChan(i int) chan ResponseMessage {
+	DPrintf("generateResponseChan  server id:%d, index:%d",kv.me,i)
 	//channel需要清理，所以同一个index理当没有channel
 	if _,ok:=kv.ResponseChans[i];ok {
 		panic("error: an invalid channel ")
 	}else {
-		kv.ResponseChans[i]=make(chan ResponseMessage)
+		//这里怎么处理呢
+		kv.ResponseChans[i]=make(chan ResponseMessage,1)
 		return kv.ResponseChans[i]
 	}
 }
@@ -208,6 +210,8 @@ func (kv* KVServer) unlock(){
 
 //无锁方法，调用外部需要加锁
 func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
+	//kv.lock("executeOp")
+	//defer kv.unlock()
 	commandId:=cmd.CommandId
 	clientId:=cmd.ClientId
 	op:=cmd.Op
@@ -215,6 +219,8 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 	if v,ok:=kv.resultMap[clientId];ok {
 		if v.CommandId==commandId {
 			return v.Response
+		}else if v.CommandId>commandId{
+			log.Panicf("a previous command ? command id:%v ,stored cmd id:%v",commandId,v.CommandId)
 		}
 	}
 
@@ -241,6 +247,15 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 		Response:  responseMsg,
 	}
 	return responseMsg
+}
+
+func (kv *KVServer) cleanAndDeleteRChan(i int) {
+	close(kv.ResponseChans[i])
+	delete(kv.ResponseChans,i)
+}
+
+func (kv *KVServer) readApplych() {
+
 }
 
 //
@@ -308,7 +323,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	//check deadlock
 	//go func() {
 	//	for  {
-	//		time.Sleep(5*time.Second)
+	//		time.Sleep(2*time.Second)
 	//		DPrintf(" server id %d , lockName %v", kv.me, kv.lockName)
 	//	}
 	//
