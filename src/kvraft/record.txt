@@ -74,7 +74,7 @@ startKV:
 
 	如果在进入v<-msg之前，select语句退出,这里会造成死锁,
 
-
+3、
 2022/06/17 01:56:07 server.go:19: server id :0 , server apply message idx:347, command:{{Get 4 } 3209770425109851883 70}
 2022/06/17 01:56:07 server.go:19: execute op save result map clientId:3209770425109851883 , commandId: 70, response message {OK x 4 0 yx 4 1 yx 4 2 yx 4 3 yx 4 4 yx 4 5 yx 4 6 yx 4 7 yx 4 8 yx 4 9 yx 4 10 yx 4 11 yx 4 12 yx 4 13 yx 4 14 yx 4 15 yx 4 16 yx 4 17 yx 4 18 yx 4 19 yx 4 20 yx 4 21 yx 4 22 yx 4 23 yx 4 24 yx 4 25 yx 4 26 yx 4 27 yx 4 28 yx 4 29 yx 4 30 yx 4 31 y}
 2022/06/17 01:56:07 server.go:19: server id :0 , server apply message idx:463, command:{{Append 3 x 3 42 y} 1674330911551912896 90}
@@ -107,7 +107,51 @@ log.txt
 因为我是用的异步提交，第一个协程还没结束的时候第二个就开始了，结果463跑到了347的前面提交，直接暴毙
 为什么lab2没有暴露这个问题？是因为lab2的test 只检测每条日志被提交的正不正确，比如log[463]的command是调用start（）方法时，返回index为463的command，并不会要求463一定要在348之前提交，
 而根据线性化原则，lab3中就不能这样
-怎么改呢？
+那么怎么改呢？
 一个方法是把异步再改回同步，原子性地更新lastapplied，但这样可能会出点问题
 如果提高提交间隔呢？感觉治标不治本，如果一次性提交log的条数增加，还是会有问题
-还有一个办法，给apply单独加把锁，apply log 开启的异步日志提交一定要获取锁才能提交，感觉这么做应该就没问题了，但是代码观感上会更挫
+还有一个办法，给apply单独加把锁，apply log 开启的异步日志提交一定要获取锁才能提交，
+感觉这么做应该就没问题了，但是代码观感上会更挫
+那么万一有很多个等待操作呢？怎么保证他们的顺序？这个应该是没问题的，go的mutex是公平锁。
+实际上尝试了也没什么问题。
+
+
+4、
+2022/06/17 06:31:10 server.go:19: execute op save result map clientId:1303277663793574013 , commandId: 32, response message {OK x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 yx 0 7 yx 0 8 yx 0 9 yx 0 10 yx 0 11 yx 0 12 yx 0 13 yx 0 14 yx 0 15 yx 0 16 y}
+2022/06/17 06:31:10 server.go:19: execute op save result map clientId:1661777327642041427 , commandId: 38, response message {OK }
+2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:175, command:{{Append 1 x 1 15 y} 4412595245740317864 31}
+2022/06/17 06:31:10 server.go:19: execute op save result map clientId:4412595245740317864 , commandId: 31, response message {OK }
+2022/06/17 06:31:10 server.go:19: server id :0 , server apply message idx:183, command:{{Append 3 x 3 15 y} 1661777327642041427 38}
+2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:176, command:{{Append 3 x 3 14 y} 1661777327642041427 37}
+2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:177, command:{{Append 0 x 0 17 y} 1303277663793574013 33}
+2022/06/17 06:31:10 server.go:19: execute op save result map clientId:1303277663793574013 , commandId: 33, response message {OK }
+2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:178, command:{{Append 4 x 4 20 y} 912209150296400740 32}
+2022/06/17 06:31:10 server.go:19: execute op save result map clientId:912209150296400740 , commandId: 32, response message {OK }
+2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:179, command:{{Append 2 x 2 18 y} 4102986777068402286 29}
+2022/06/17 06:31:10 server.go:19: execute op save result map clientId:4102986777068402286 , commandId: 29, response message {OK }
+2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:180, command:{{Get 1 } 4412595245740317864 32}
+2022/06/17 06:31:10 server.go:19: execute op save result map clientId:4412595245740317864 , commandId: 32, response message {OK x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 yx 1 8 yx 1 9 yx 1 10 yx 1 11 yx 1 12 yx 1 13 yx 1 14 yx 1 15 y}
+2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:181, command:{{Append 4 x 4 21 y} 912209150296400740 33}
+2022/06/17 06:31:10 server.go:19: execute op save result map clientId:912209150296400740 , commandId: 33, response message {OK }
+2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:182, command:{{Append 3 x 3 15 y} 1661777327642041427 38}
+2022/06/17 06:31:10 server.go:19: execute op save result map clientId:1661777327642041427 , commandId: 38, response message {OK }
+2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:183, command:{{Append 3 x 3 15 y} 1661777327642041427 38}
+2022/06/17 06:31:10 server.go:19: client get result , client id 1303277663793574013,  command id 34, result OK time 6.837072s
+2022/06/17 06:31:10 server.go:19: client get result , client id 4412595245740317864,  command id 32, result OK time 6.837072s
+2022/06/17 06:31:10 test_test.go:222: get wrong value, key 0, wanted:
+x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 yx 0 7 yx 0 8 yx 0 9 yx 0 10 yx 0 11 yx 0 12 yx 0 13 yx 0 14 yx 0 15 yx 0 16 yx 0 17 y
+, got
+
+2022/06/17 06:31:10 test_test.go:222: get wrong value, key 1, wanted:
+x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 yx 1 8 yx 1 9 yx 1 10 yx 1 11 yx 1 12 yx 1 13 yx 1 14 yx 1 15 y
+, got
+
+有不太高的概率会get wrong value。为什么呢，按照我的日志，状态机应该是完整地重播了整个raft日志才对啊？
+
+
+
+
+
+
+仔细观察一下原来是因为我想法出了问题
+可以看到这里在疯狂apply，我在kvserver 层面并没有做持久化的工作，导致状态机会被清空，而

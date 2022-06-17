@@ -219,6 +219,10 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 					log.Printf("%d: client new get %v\n", cli, key)
 					v := Get(cfg, myck, key)
 					if v != last {
+						//报错前先给我看看kvservers的状态
+						for _,kvserver:=range cfg.kvservers {
+							kvserver.PrintStateMachine()
+						}
 						log.Fatalf("get wrong value, key %v, wanted:\n%v\n, got\n%v\n", key, last, v)
 					}
 				}

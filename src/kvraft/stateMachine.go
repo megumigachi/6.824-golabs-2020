@@ -23,3 +23,4 @@ func(sm* StateMachine)Append(key string,value string){
 		sm.data[key]=value
 	}
 }
+

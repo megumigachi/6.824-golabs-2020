@@ -218,11 +218,12 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 	op:=cmd.Op
 	//already executed
 	if v,ok:=kv.resultMap[clientId];ok {
-		if v.CommandId==commandId {
+		if v.CommandId==commandId &&!(op.Key==OP_GET){
 			return v.Response
 		}else if v.CommandId>commandId{
 			//一旦后面的command id传出（并被store）意味着前面的command id已经获得了承认，为什么会重发？
-			log.Panicf("server id %d : a previous command ? clientId:%d, command id:%v ,stored cmd id:%v",kv.me,clientId,commandId,v.CommandId)
+			//log.Panicf("server id %d : a previous command ? clientId:%d, command id:%v ,stored cmd id:%v",kv.me,clientId,commandId,v.CommandId)
+			//todo: discard duplicated logs
 		}
 	}
 
@@ -280,6 +281,11 @@ func (kv *KVServer) readApplych() {
 		}
 	}
 }
+
+func (kv *KVServer)PrintStateMachine()  {
+	log.Printf("kvserver :%d, statemachine %v",kv.me,kv.stateMachine.data)
+}
+
 
 //
 // servers[] contains the ports of the set of
