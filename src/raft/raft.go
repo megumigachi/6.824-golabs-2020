@@ -64,7 +64,7 @@ const (
 	ElectionTimeout=300
 	HeartBeatTimeOut=100
 	RpcToleranceTimeOut=100
-	ApplyTimeOut=50
+	ApplyTimeOut=100
 )
 
 type Raft struct {
@@ -109,6 +109,12 @@ type Raft struct {
 	lockTime time.Time
 	startTime time.Time
 
+	//lab3中线性化用的apply锁，因为日志过长时（比如，因为crash导致lastapplied重置）
+	//提交日志可能会超过ApplyTimeOut ，导致上一个routine还没有结束，下一个就开始
+	//从而破坏线性化
+	//应该不能改成同步，因为同步可能会导致raft被锁在同步方法里长达数百ms
+	//golang的锁应该是公平的，即使多个队列等待也不会有问题
+	applyMutex sync.Mutex
 
 	stopSignal chan int
 }
@@ -330,9 +336,11 @@ func (rf *Raft) applyLogs() {
 		}
 		rf.unlock("apply logs")
 		go func() {
+			rf.applyMutex.Lock()
 			for _,item:=range msgs {
 				rf.applyCh<-item
 			}
+			rf.applyMutex.Unlock()
 		}()
 
 	}

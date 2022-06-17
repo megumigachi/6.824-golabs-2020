@@ -171,6 +171,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 // to suppress debug output from a Kill()ed instance.
 //
 func (kv *KVServer) Kill() {
+	DPrintf("server killed id %d",kv.me)
 	atomic.StoreInt32(&kv.dead, 1)
 	kv.rf.Kill()
 	//close(kv.stopch)
@@ -220,7 +221,8 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 		if v.CommandId==commandId {
 			return v.Response
 		}else if v.CommandId>commandId{
-			log.Panicf("a previous command ? command id:%v ,stored cmd id:%v",commandId,v.CommandId)
+			//一旦后面的command id传出（并被store）意味着前面的command id已经获得了承认，为什么会重发？
+			log.Panicf("server id %d : a previous command ? clientId:%d, command id:%v ,stored cmd id:%v",kv.me,clientId,commandId,v.CommandId)
 		}
 	}
 
@@ -254,8 +256,29 @@ func (kv *KVServer) cleanAndDeleteRChan(i int) {
 	delete(kv.ResponseChans,i)
 }
 
+//从applyCh中读取数据
 func (kv *KVServer) readApplych() {
-
+	for m:=range kv.applyCh {
+		idx:=m.CommandIndex
+		command:=m.Command
+		valid:=m.CommandValid
+		DPrintf("server id :%d , server apply message idx:%v, command:%v",kv.me,idx,command)
+		if valid {
+			//apply command to state machine and then tell notify channel if possible
+			cmd:=command.(Command)
+			kv.lock("apply operation")
+			msg:=kv.executeOperation(cmd)
+			if v,ok:=kv.ResponseChans[idx];ok{
+				v<-msg
+			}else {
+				//maybe not a leader or request has been timeout
+				//DPrintf("response has been timeout\n")
+			}
+			kv.unlock()
+		}else {
+			//todo:invalid command?
+		}
+	}
 }
 
 //
@@ -294,40 +317,23 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.resultMap=make(map[int64]ResponseRecord)
 
 	kv.startTime=time.Now()
-	//从applyCh中读取数据
+
 	go func() {
-		for m:=range kv.applyCh {
-			idx:=m.CommandIndex
-			command:=m.Command
-			valid:=m.CommandValid
-			DPrintf("server id :%d , server apply message idx:%v, command:%v",kv.me,idx,command)
-			if valid {
-				//apply command to state machine and then tell notify channel if possible
-				cmd:=command.(Command)
-				kv.lock("apply operation")
-				msg:=kv.executeOperation(cmd)
-				if v,ok:=kv.ResponseChans[idx];ok{
-					v<-msg
-				}else {
-					//maybe not a leader
-					//DPrintf("response has been timeout\n")
-				}
-				kv.unlock()
-			}else {
-				//todo:invalid command?
-			}
-		}
+		kv.readApplych()
 	}()
 
 
 	//check deadlock
-	go func() {
-		for  {
-			time.Sleep(2*time.Second)
-			DPrintf(" server id %d , lockName %v", kv.me, kv.lockName)
-		}
+	//go func() {
+	//	for  {
+	//		time.Sleep(2*time.Second)
+	//		DPrintf(" server id %d , lockName %v", kv.me, kv.lockName)
+	//	}
+	//
+	//}()
 
-	}()
+	DPrintf("make kv server : id %d",kv.me)
+
 
 	return kv
 }

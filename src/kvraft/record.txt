@@ -73,3 +73,41 @@ startKV:
 	}()
 
 	如果在进入v<-msg之前，select语句退出,这里会造成死锁,
+
+
+2022/06/17 01:56:07 server.go:19: server id :0 , server apply message idx:347, command:{{Get 4 } 3209770425109851883 70}
+2022/06/17 01:56:07 server.go:19: execute op save result map clientId:3209770425109851883 , commandId: 70, response message {OK x 4 0 yx 4 1 yx 4 2 yx 4 3 yx 4 4 yx 4 5 yx 4 6 yx 4 7 yx 4 8 yx 4 9 yx 4 10 yx 4 11 yx 4 12 yx 4 13 yx 4 14 yx 4 15 yx 4 16 yx 4 17 yx 4 18 yx 4 19 yx 4 20 yx 4 21 yx 4 22 yx 4 23 yx 4 24 yx 4 25 yx 4 26 yx 4 27 yx 4 28 yx 4 29 yx 4 30 yx 4 31 y}
+2022/06/17 01:56:07 server.go:19: server id :0 , server apply message idx:463, command:{{Append 3 x 3 42 y} 1674330911551912896 90}
+2022/06/17 01:56:07 server.go:19: execute op save result map clientId:1674330911551912896 , commandId: 90, response message {OK }
+2022/06/17 01:56:07 server.go:19: server id :1 , server apply message idx:326, command:{{Append 3 x 3 29 y} 1674330911551912896 63}
+2022/06/17 01:56:07 server.go:19: execute op save result map clientId:1674330911551912896 , commandId: 63, response message {OK }
+2022/06/17 01:56:07 server.go:19: execute op save result map clientId:2177612684096167051 , commandId: 56, response message {OK x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 yx 1 8 yx 1 9 yx 1 10 yx 1 11 yx 1 12 yx 1 13 yx 1 14 yx 1 15 yx 1 16 yx 1 17 yx 1 18 yx 1 19 yx 1 20 yx 1 21 yx 1 22 yx 1 23 yx 1 24 yx 1 25 yx 1 26 yx 1 27 yx 1 28 yx 1 29 y}
+2022/06/17 01:56:07 server.go:19: server id :3 , server apply message idx:283, command:{{Get 3 } 1674330911551912896 55}
+2022/06/17 01:56:07 server.go:19: server id :1 , server apply message idx:327, command:{{Append 2 x 2 40 y} 4308875949454247975 66}
+2022/06/17 01:56:07 server.go:19: execute op save result map clientId:4308875949454247975 , commandId: 66, response message {OK }
+2022/06/17 01:56:07 server.go:19: server id :1 , server apply message idx:328, command:{{Get 1 } 2177612684096167051 65}
+2022/06/17 01:56:07 server.go:19: execute op save result map clientId:2177612684096167051 , commandId: 65, response message {OK x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 yx 1 8 yx 1 9 yx 1 10 yx 1 11 yx 1 12 yx 1 13 yx 1 14 yx 1 15 yx 1 16 yx 1 17 yx 1 18 yx 1 19 yx 1 20 yx 1 21 yx 1 22 yx 1 23 yx 1 24 yx 1 25 yx 1 26 yx 1 27 yx 1 28 yx 1 29 yx 1 30 yx 1 31 yx 1 32 yx 1 33 yx 1 34 y}
+2022/06/17 01:56:07 server.go:19: server id :1 , server apply message idx:329, command:{{Get 4 } 3209770425109851883 66}
+2022/06/17 01:56:07 server.go:19: server id :0 , server apply message idx:348, command:{{Append 3 x 3 32 y} 1674330911551912896 68}
+2022/06/17 01:56:07 server.go:225: server id 0 : a previous command ? clientId:1674330911551912896, command id:68 ,stored cmd id:90
+2022/06/17 01:56:07 server.go:19: execute op save result map clientId:3209770425109851883 , commandId: 66, response message {OK x 4 0 yx 4 1 yx 4 2 yx 4 3 yx 4 4 yx 4 5 yx 4 6 yx 4 7 yx 4 8 yx 4 9 yx 4 10 yx 4 11 yx 4 12 yx 4 13 yx 4 14 yx 4 15 yx 4 16 yx 4 17 yx 4 18 yx 4 19 yx 4 20 yx 4 21 yx 4 22 yx 4 23 yx 4 24 yx 4 25 yx 4 26 yx 4 27 yx 4 28 yx 4 29 y}
+2022/06/17 01:56:07 server.go:19: server id :1 , server apply message idx:330, command:{{Append 3 x 3 30 y} 1674330911551912896 64}
+
+
+347->463->348 见了鬼了
+
+大概原因是这样
+log.txt
+    line 10258:
+    2022/06/17 01:56:07 util.go:30: start applying logs, server id:0 ,from:1 , to 462, time 408.3439ms
+    line 12765
+    2022/06/17 01:56:07 util.go:30: start applying logs, server id:0 ,from:463 , to 465, time 459.207ms
+
+大概50ms也不够提交这么多条记录.....吧
+因为我是用的异步提交，第一个协程还没结束的时候第二个就开始了，结果463跑到了347的前面提交，直接暴毙
+为什么lab2没有暴露这个问题？是因为lab2的test 只检测每条日志被提交的正不正确，比如log[463]的command是调用start（）方法时，返回index为463的command，并不会要求463一定要在348之前提交，
+而根据线性化原则，lab3中就不能这样
+怎么改呢？
+一个方法是把异步再改回同步，原子性地更新lastapplied，但这样可能会出点问题
+如果提高提交间隔呢？感觉治标不治本，如果一次性提交log的条数增加，还是会有问题
+还有一个办法，给apply单独加把锁，apply log 开启的异步日志提交一定要获取锁才能提交，感觉这么做应该就没问题了，但是代码观感上会更挫

@@ -42,6 +42,8 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck.startTime=time.Now()
 
 	// You'll have to add code here.
+
+	DPrintf("make client : id %d",ck.clientId)
 	return ck
 }
 
