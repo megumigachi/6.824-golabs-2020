@@ -229,7 +229,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			}
 		})
 
-		//网络分区？
+		//人造网络分区
 		if partitions {
 			// Allow the clients to perform some operations without interruption
 			time.Sleep(1 * time.Second)
@@ -243,7 +243,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 
 		//分区则恢复, crash 则 重启
 		if partitions {
-			// log.Printf("wait for partitioner\n")
+			log.Printf("wait for partitioner\n")
 			<-ch_partitioner
 			// reconnect network and submit a request. A client may
 			// have submitted a request in a minority.  That request

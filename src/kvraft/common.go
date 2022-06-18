@@ -44,6 +44,8 @@ type GetReply struct {
 }
 
 type ResponseMessage struct {
+	ClientId int64
+	CommandId int
 	Err   Err
 	Value string
 }

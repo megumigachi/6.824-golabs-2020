@@ -92,8 +92,13 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 
 	select {
 		case responseMsg:=<-ch:{
-			reply.Err=responseMsg.Err
-			reply.Value=responseMsg.Value
+			//是否对应该请求
+			if responseMsg.CommandId==args.CommandId&&responseMsg.ClientId==args.ClientId {
+				reply.Err=responseMsg.Err
+				reply.Value=responseMsg.Value
+			}else {
+				reply.Err=ErrWrongLeader
+			}
 		}
 		case <-time.After(RequestTimeOut):{
 			reply.Err=ErrTimeOut
@@ -145,7 +150,11 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 
 	select {
 		case responseMsg:=<-ch:{
-			reply.Err=responseMsg.Err
+			if responseMsg.CommandId==args.CommandId&&responseMsg.ClientId==args.ClientId {
+				reply.Err=responseMsg.Err
+			}else {
+				reply.Err=ErrWrongLeader
+			}
 		}
 		case <-time.After(RequestTimeOut):{
 			reply.Err=ErrTimeOut
@@ -218,7 +227,8 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 	op:=cmd.Op
 	//already executed
 	if v,ok:=kv.resultMap[clientId];ok {
-		if v.CommandId==commandId &&!(op.Key==OP_GET){
+		//&&!(op.Key==OP_GET)
+		if v.CommandId==commandId&&!(op.Key==OP_GET) {
 			return v.Response
 		}else if v.CommandId>commandId{
 			//一旦后面的command id传出（并被store）意味着前面的command id已经获得了承认，为什么会重发？
@@ -228,6 +238,8 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 	}
 
 	responseMsg:=ResponseMessage{
+		ClientId:clientId,
+		CommandId:commandId,
 		Err:   OK,
 		Value: "",
 	}
@@ -270,6 +282,7 @@ func (kv *KVServer) readApplych() {
 			kv.lock("apply operation")
 			msg:=kv.executeOperation(cmd)
 			if v,ok:=kv.ResponseChans[idx];ok{
+				DPrintf("[server id :%d] notify message [idx:%d] [command:%v] [msg:%v]",kv.me,idx,command,msg)
 				v<-msg
 			}else {
 				//maybe not a leader or request has been timeout
