@@ -117,41 +117,49 @@ log.txt
 
 
 4、
-2022/06/17 06:31:10 server.go:19: execute op save result map clientId:1303277663793574013 , commandId: 32, response message {OK x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 yx 0 7 yx 0 8 yx 0 9 yx 0 10 yx 0 11 yx 0 12 yx 0 13 yx 0 14 yx 0 15 yx 0 16 y}
-2022/06/17 06:31:10 server.go:19: execute op save result map clientId:1661777327642041427 , commandId: 38, response message {OK }
-2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:175, command:{{Append 1 x 1 15 y} 4412595245740317864 31}
-2022/06/17 06:31:10 server.go:19: execute op save result map clientId:4412595245740317864 , commandId: 31, response message {OK }
-2022/06/17 06:31:10 server.go:19: server id :0 , server apply message idx:183, command:{{Append 3 x 3 15 y} 1661777327642041427 38}
-2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:176, command:{{Append 3 x 3 14 y} 1661777327642041427 37}
-2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:177, command:{{Append 0 x 0 17 y} 1303277663793574013 33}
-2022/06/17 06:31:10 server.go:19: execute op save result map clientId:1303277663793574013 , commandId: 33, response message {OK }
-2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:178, command:{{Append 4 x 4 20 y} 912209150296400740 32}
-2022/06/17 06:31:10 server.go:19: execute op save result map clientId:912209150296400740 , commandId: 32, response message {OK }
-2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:179, command:{{Append 2 x 2 18 y} 4102986777068402286 29}
-2022/06/17 06:31:10 server.go:19: execute op save result map clientId:4102986777068402286 , commandId: 29, response message {OK }
-2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:180, command:{{Get 1 } 4412595245740317864 32}
-2022/06/17 06:31:10 server.go:19: execute op save result map clientId:4412595245740317864 , commandId: 32, response message {OK x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 yx 1 8 yx 1 9 yx 1 10 yx 1 11 yx 1 12 yx 1 13 yx 1 14 yx 1 15 y}
-2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:181, command:{{Append 4 x 4 21 y} 912209150296400740 33}
-2022/06/17 06:31:10 server.go:19: execute op save result map clientId:912209150296400740 , commandId: 33, response message {OK }
-2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:182, command:{{Append 3 x 3 15 y} 1661777327642041427 38}
-2022/06/17 06:31:10 server.go:19: execute op save result map clientId:1661777327642041427 , commandId: 38, response message {OK }
-2022/06/17 06:31:10 server.go:19: server id :1 , server apply message idx:183, command:{{Append 3 x 3 15 y} 1661777327642041427 38}
-2022/06/17 06:31:10 server.go:19: client get result , client id 1303277663793574013,  command id 34, result OK time 6.837072s
-2022/06/17 06:31:10 server.go:19: client get result , client id 4412595245740317864,  command id 32, result OK time 6.837072s
-2022/06/17 06:31:10 test_test.go:222: get wrong value, key 0, wanted:
-x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 yx 0 7 yx 0 8 yx 0 9 yx 0 10 yx 0 11 yx 0 12 yx 0 13 yx 0 14 yx 0 15 yx 0 16 yx 0 17 y
+2022/06/18 04:06:28 util.go:30: start agreement: rf.id is4,rf.log length is 86,return index:86 , command is {{Get 3 } 2887644937669209389 14} , time is 5.384041466s
+......
+2022/06/18 04:06:28 util.go:30: dealing append entries server id:4, log start:76,log len:12,leaderCommit:86,time:5.551129439s
+2022/06/18 04:06:28 util.go:30: start applying logs, server id:4 ,from:77 , to 86, time 5.554337403s
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:77, command:{{Append 0 x 0 6 y} 4260293379825124248 13}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4260293379825124248 , commandId: 13, response message {OK }
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:78, command:{{Get 0 } 4260293379825124248 14}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4260293379825124248 , commandId: 14, response message {OK x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 y}
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:79, command:{{Get 2 } 4124437119182591392 14}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4124437119182591392 , commandId: 14, response message {OK x 2 0 yx 2 1 yx 2 2 yx 2 3 yx 2 4 yx 2 5 yx 2 6 yx 2 7 yx 2 8 yx 2 9 y}
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:80, command:{{Get 0 } 4260293379825124248 15}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4260293379825124248 , commandId: 15, response message {OK x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 y}
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:81, command:{{Append 2 x 2 10 y} 4124437119182591392 15}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4124437119182591392 , commandId: 15, response message {OK }
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:82, command:{{Get 0 } 4260293379825124248 16}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4260293379825124248 , commandId: 16, response message {OK x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 y}
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:83, command:{{Get 2 } 4124437119182591392 16}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4124437119182591392 , commandId: 16, response message {OK x 2 0 yx 2 1 yx 2 2 yx 2 3 yx 2 4 yx 2 5 yx 2 6 yx 2 7 yx 2 8 yx 2 9 yx 2 10 y}
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:84, command:{{Append 2 x 2 11 y} 4124437119182591392 17}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4124437119182591392 , commandId: 17, response message {OK }
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:85, command:{{Get 0 } 4260293379825124248 17}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4260293379825124248 , commandId: 17, response message {OK x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 y}
+2022/06/18 04:06:28 server.go:19: [server id :4] notify message [idx:85] [command:{{Get 0 } 4260293379825124248 17}] [msg:{OK x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 y}]
+2022/06/18 04:06:28 server.go:19: server id :4 , server apply message idx:86, command:{{Append 0 x 0 7 y} 4260293379825124248 18}
+2022/06/18 04:06:28 server.go:19: execute op save result map clientId:4260293379825124248 , commandId: 18, response message {OK }
+2022/06/18 04:06:28 server.go:19: [server id :4] notify message [idx:86] [command:{{Append 0 x 0 7 y} 4260293379825124248 18}] [msg:{OK }]
+2022/06/18 04:06:28 server.go:19: client get result , client id 2887644937669209389,  command id 14, result OK time 5.554343203s
+2022/06/18 04:06:28 server.go:288: kvserver :0, statemachine map[0:x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 yx 0 7 y 1:x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 y 2:x 2 0 yx 2 1 yx 2 2 yx 2 3 yx 2 4 yx 2 5 yx 2 6 yx 2 7 yx 2 8 yx 2 9 yx 2 10 yx 2 11 y 3:x 3 0 yx 3 1 yx 3 2 yx 3 3 yx 3 4 y 4:x 4 0 yx 4 1 yx 4 2 yx 4 3 yx 4 4 yx 4 5 yx 4 6 yx 4 7 y]
+2022/06/18 04:06:28 server.go:288: kvserver :1, statemachine map[0:x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 y 1:x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 y 2:x 2 0 yx 2 1 yx 2 2 yx 2 3 yx 2 4 yx 2 5 yx 2 6 yx 2 7 yx 2 8 yx 2 9 y 3:x 3 0 yx 3 1 yx 3 2 yx 3 3 yx 3 4 y 4:x 4 0 yx 4 1 yx 4 2 yx 4 3 yx 4 4 yx 4 5 yx 4 6 yx 4 7 y]
+2022/06/18 04:06:28 server.go:288: kvserver :2, statemachine map[0:x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 y 1:x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 y 2:x 2 0 yx 2 1 yx 2 2 yx 2 3 yx 2 4 yx 2 5 yx 2 6 yx 2 7 yx 2 8 yx 2 9 yx 2 10 yx 2 11 y 3:x 3 0 yx 3 1 yx 3 2 yx 3 3 yx 3 4 y 4:x 4 0 yx 4 1 yx 4 2 yx 4 3 yx 4 4 yx 4 5 yx 4 6 yx 4 7 y]
+2022/06/18 04:06:28 server.go:288: kvserver :3, statemachine map[0:x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 yx 0 7 y 1:x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 y 2:x 2 0 yx 2 1 yx 2 2 yx 2 3 yx 2 4 yx 2 5 yx 2 6 yx 2 7 yx 2 8 yx 2 9 yx 2 10 yx 2 11 y 3:x 3 0 yx 3 1 yx 3 2 yx 3 3 yx 3 4 y 4:x 4 0 yx 4 1 yx 4 2 yx 4 3 yx 4 4 yx 4 5 yx 4 6 yx 4 7 y]
+2022/06/18 04:06:28 server.go:288: kvserver :4, statemachine map[0:x 0 0 yx 0 1 yx 0 2 yx 0 3 yx 0 4 yx 0 5 yx 0 6 yx 0 7 y 1:x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 y 2:x 2 0 yx 2 1 yx 2 2 yx 2 3 yx 2 4 yx 2 5 yx 2 6 yx 2 7 yx 2 8 yx 2 9 yx 2 10 yx 2 11 y 3:x 3 0 yx 3 1 yx 3 2 yx 3 3 yx 3 4 y 4:x 4 0 yx 4 1 yx 4 2 yx 4 3 yx 4 4 yx 4 5 yx 4 6 yx 4 7 y]
+2022/06/18 04:06:28 test_test.go:226: get wrong value, key 3, wanted:
+x 3 0 yx 3 1 yx 3 2 yx 3 3 yx 3 4 y
 , got
 
-2022/06/17 06:31:10 test_test.go:222: get wrong value, key 1, wanted:
-x 1 0 yx 1 1 yx 1 2 yx 1 3 yx 1 4 yx 1 5 yx 1 6 yx 1 7 yx 1 8 yx 1 9 yx 1 10 yx 1 11 yx 1 12 yx 1 13 yx 1 14 yx 1 15 y
-, got
 
-有不太高的概率会get wrong value。为什么呢，按照我的日志，状态机应该是完整地重播了整个raft日志才对啊？
+有概率会get wrong value。为什么呢，按照我的日志，状态机应该是完整地重播了整个raft日志才对啊？
+细想一下大概就知道了（然而我百思不得其解地看了四五个小时），网络分区等许多情形会造成上面的情况，client向leader0 发送请求
+leader0通过start（）获取了预定的log index，然后开启channel进入等待，此时收到了leader1的消息转化为follower，提交了leader1的
+log之后，client的请求被leader1的log覆盖了，比如上面就是get被append请求覆盖的结果，导致返回了空。
+
+如何解决呢？leader不会删除自己的log，导致log不一致一定是因为变成了follwer？
+还是比较一下command？（最终解决方案）
 
 
-
-
-
-
-仔细观察一下原来是因为我想法出了问题
-可以看到这里在疯狂apply，我在kvserver 层面并没有做持久化的工作，导致状态机会被清空，而
