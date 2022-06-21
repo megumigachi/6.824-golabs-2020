@@ -4,6 +4,7 @@ import (
 	"../labgob"
 	"../labrpc"
 	"../raft"
+	"bytes"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -299,6 +300,40 @@ func (kv *KVServer)PrintStateMachine()  {
 	log.Printf("kvserver :%d, statemachine %v",kv.me,kv.stateMachine.data)
 }
 
+//生成快照
+func (kv *KVServer) genSnapshotData() []byte {
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	if err := e.Encode(kv.stateMachine); err != nil {
+		panic(err)
+	}
+	if err := e.Encode(kv.resultMap); err != nil {
+		panic(err)
+	}
+	data := w.Bytes()
+	return data
+}
+
+//读取快照
+func (kv *KVServer) readPersist(data []byte) {
+	if data == nil || len(data) < 1 { // bootstrap without any state?
+		return
+	}
+
+	r := bytes.NewBuffer(data)
+	d := labgob.NewDecoder(r)
+
+	var stateMachine StateMachine
+	var resultMap map[int64]ResponseRecord
+
+	if d.Decode(&stateMachine) != nil ||
+		d.Decode(&resultMap) != nil {
+		log.Fatal("kv read persist err")
+	} else {
+		kv.stateMachine = stateMachine
+		kv.resultMap = resultMap
+	}
+}
 
 //
 // servers[] contains the ports of the set of
