@@ -60,6 +60,7 @@ type KVServer struct {
 	resultMap	 map[int64] ResponseRecord	//记载最新的response
 	maxraftstate int // snapshot if log grows this big
 
+	persister *raft.Persister
 	// Your definitions here.
 }
 
@@ -98,8 +99,10 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 				reply.Err=responseMsg.Err
 				reply.Value=responseMsg.Value
 			}else {
+				//消息传回时，leader已经被干掉了,导致log被替换掉了，apply的是被替换掉的log
 				reply.Err=ErrWrongLeader
 			}
+
 		}
 		case <-time.After(RequestTimeOut):{
 			reply.Err=ErrTimeOut
@@ -272,36 +275,56 @@ func (kv *KVServer) cleanAndDeleteRChan(i int) {
 
 //从applyCh中读取数据
 func (kv *KVServer) readApplych() {
-	for m:=range kv.applyCh {
-		idx:=m.CommandIndex
-		command:=m.Command
-		valid:=m.CommandValid
-		DPrintf("server id :%d , server apply message idx:%v, command:%v",kv.me,idx,command)
-		if valid {
-			//apply command to state machine and then tell notify channel if possible
-			cmd:=command.(Command)
-			kv.lock("apply operation")
-			msg:=kv.executeOperation(cmd)
-			if v,ok:=kv.ResponseChans[idx];ok{
-				DPrintf("[server id :%d] notify message [idx:%d] [command:%v] [msg:%v]",kv.me,idx,command,msg)
-				v<-msg
+	for !kv.killed()  {
+		for m:=range kv.applyCh {
+			idx:=m.CommandIndex
+			command:=m.Command
+			valid:=m.CommandValid
+			DPrintf("server id :%d , server apply message idx:%v, command:%v",kv.me,idx,command)
+			if valid {
+				//apply command to state machine and then tell notify channel if possible
+				cmd:=command.(Command)
+				kv.lock("apply operation")
+				msg:=kv.executeOperation(cmd)
+				if v,ok:=kv.ResponseChans[idx];ok{
+					DPrintf("[server id :%d] notify message [idx:%d] [command:%v] [msg:%v]",kv.me,idx,command,msg)
+					v<-msg
+				}else {
+					//maybe not a leader or request has been timeout
+				}
+				kv.unlock()
 			}else {
-				//maybe not a leader or request has been timeout
-				//DPrintf("response has been timeout\n")
+				//todo:invalid command? snapshot?
 			}
-			kv.unlock()
-		}else {
-			//todo:invalid command?
+			//尝试生成快照
+			kv.saveDataToSnapshot()
 		}
 	}
+
 }
 
 func (kv *KVServer)PrintStateMachine()  {
 	log.Printf("kvserver :%d, statemachine %v",kv.me,kv.stateMachine.data)
 }
 
+//尝试将data写入snapshot
+func (kv *KVServer) saveDataToSnapshot()  {
+	raftSize:=kv.persister.RaftStateSize()
+	if kv.maxraftstate==-1 {
+		return
+	}
+	if raftSize<kv.maxraftstate{
+		return
+	}
+
+	//snapshotBytes:=kv.generateSnapshotData()
+	//todo: raft
+
+}
+
+
 //生成快照
-func (kv *KVServer) genSnapshotData() []byte {
+func (kv *KVServer) generateSnapshotData() []byte {
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
 	if err := e.Encode(kv.stateMachine); err != nil {
@@ -371,6 +394,8 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.resultMap=make(map[int64]ResponseRecord)
 
 	kv.startTime=time.Now()
+
+	kv.persister=persister
 
 	go func() {
 		kv.readApplych()
