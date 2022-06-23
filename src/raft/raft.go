@@ -20,8 +20,6 @@ package raft
 import (
 	"../labgob"
 	"bytes"
-	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -117,6 +115,10 @@ type Raft struct {
 	applyMutex sync.Mutex
 
 	stopSignal chan int
+
+	//for lab 3b
+	lastSnapshotIdx int
+	lastSnapshotTerm int
 }
 
 
@@ -194,7 +196,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		newLog.Command=command
 		rf.log=append(rf.log, newLog)
 		rf.persist()
-		DPrintf("start agreement: rf.id is%d,rf.log length is %d,return index:%d , command is %v , time is %v", rf.me,len(rf.log)-1,index+1,command, time.Now().Sub(rf.startTime))
+		DPrintf("start agreement: rf.id is%d,return index:%d , command is %v , time is %v", rf.me,index+1,command, time.Now().Sub(rf.startTime))
 		//对于每一个server立即发送一条append entry 请求
 		for i:=0;i<rf.me;i++ {
 			if rf.me==i{
@@ -226,7 +228,7 @@ func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
 	close(rf.stopSignal)
-	log.Println(fmt.Sprintf("killed: server id:%d,log length:%d,commitIdx:%d",rf.me,len(rf.log)-1,rf.commitIndex))
+	//log.Println(fmt.Sprintf("killed: server id:%d,log length:%d,commitIdx:%d",rf.me,len(rf.log)-1,rf.commitIndex))
 
 }
 
@@ -235,14 +237,18 @@ func (rf *Raft) killed() bool {
 	return z == 1
 }
 
-func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
 
+func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
 	log:=rf.log
-	//if len(log)==0 {
-	//	return -1,0
-	//}
-	return len(log)-1,log[len(log)-1].Term
+	if rf.lastSnapshotIdx==0 {
+		return len(log)-1,log[len(log)-1].Term
+	}
+	idx:=len(log)-1+rf.lastSnapshotIdx
+	term :=log[len(log)-1].Term
+	return idx,term
 }
+
+
 
 func (rf* Raft) changeRole(role int)  {
 	//DPrintf("change role: serverid: %d,changerole %d, time:%v \n",rf.me,role,rf.getTimeLine())
@@ -289,9 +295,6 @@ func (rf* Raft) changeRole(role int)  {
 		}
 	}
 
-	// set leader state
-
-
 }
 
 
@@ -324,7 +327,7 @@ func (rf *Raft) applyLogs() {
 		msgs:=make([]ApplyMsg,0)
 		for rf.lastApplied<rf.commitIndex  {
 			rf.lastApplied++
-			index:=rf.lastApplied
+			index:=rf.getLogIdxByRealIdx(rf.lastApplied)
 			command:=rf.log[index].Command
 			applymsg := ApplyMsg{
 				true,
@@ -350,14 +353,24 @@ func (rf *Raft) applyLogs() {
 //not concurrent-safe
 func (rf *Raft) persist() {
 	// Your code here (2C).
+	data := rf.generatePersistData()
+	rf.persister.SaveRaftState(data)
+}
+
+func (rf *Raft) generatePersistData() []byte {
+	// Your code here (2C).
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
 	e.Encode(rf.currentTerm)
 	e.Encode(rf.voteFor)
 	e.Encode(rf.log)
+	e.Encode(rf.lastSnapshotIdx)
+	e.Encode(rf.lastSnapshotTerm)
 	data := w.Bytes()
-	rf.persister.SaveRaftState(data)
+	return data
 }
+
+
 
 func (rf *Raft) readPersist(data []byte) {
 	if data == nil || len(data) < 1 { // bootstrap without any state?
@@ -372,17 +385,26 @@ func (rf *Raft) readPersist(data []byte) {
 	d.Decode(&rf.currentTerm)
 	d.Decode(&rf.voteFor)
 	d.Decode(&rf.log)
+	d.Decode(&rf.lastSnapshotIdx)
+	d.Decode(&rf.lastSnapshotTerm)
 
-	DPrintf("reading persist, id is %d, currentTerm is %d, votefor:%d, log length:%d\n" ,rf.me,rf.currentTerm,rf.voteFor, len(rf.log)-1)
+	//DPrintf("reading persist, id is %d, currentTerm is %d, votefor:%d, log length:%d\n" ,rf.me,rf.currentTerm,rf.voteFor, len(rf.log)-1)
 }
 
-func (rf *Raft) printState() {
-	rf.lock("printState")
-	defer rf.unlock("printState")
-	DPrintf("printState: id=%d, term=%d, role=%d, log length:%d ,last log term:%d, commitIndex:%d\n", rf.me,rf.currentTerm,rf.role, len(rf.log)-1,rf.log[len(rf.log)-1].Term,rf.commitIndex)
+//给定真正index 获取其在log中的index, 对应term
+func (rf *Raft) getLogIdxAndTermByRealIdx(i int)(int,int)  {
+	if i<rf.lastSnapshotIdx {
+		panic("index < last snap index")
+	}
+	return i-rf.lastSnapshotIdx,rf.log[i-rf.lastSnapshotIdx].Term
 }
 
-
+func (rf* Raft) getLogIdxByRealIdx(i int) int{
+	if i<rf.lastSnapshotIdx {
+		panic("index < last snap index")
+	}
+	return i-rf.lastSnapshotIdx
+}
 
 //
 // the service or tester wants to create a Raft server. the ports
@@ -415,6 +437,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 		rf.currentTerm=0
 		rf.voteFor=-1
 		rf.log=make([]Log,0)
+		rf.lastSnapshotIdx=0
+		rf.lastSnapshotTerm=0
 		//初始化填充
 		if len(rf.log)==0 {
 			rf.log=append(rf.log,Log{
@@ -446,14 +470,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	}
 	rf.applyTimer=time.NewTimer(ApplyTimeOut*time.Millisecond)
 
-	//todo:这里需要修改，因为在重启的时候可能会重新读取某些属性（如votefor）而不会按照这个逻辑
 	rf.changeRole(Follower)
-	//用来人造bug
-	//rf.electionTimer.Reset(time.Duration(me+ElectionTimeout)*time.Millisecond)
-	//rf.electionTimer.Stop()
-
-
-
 
 	// election listener
 	//now:=time.Now()
@@ -471,7 +488,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 		}
 	}()
 
-	//append entries
+	//append entries timers
 	for i:=0;i< len(rf.peers);i++  {
 		idx:=i
 		if idx==rf.me {
@@ -509,14 +526,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	//		time.Sleep(time.Millisecond * 300)
 	//		//log.Println(fmt.Sprintf("server id:%d,lock:%s, time:%v", rf.me,rf.lockName, time.Now().Sub(rf.startTime)))
 	//		//log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
-	//		log.Println(fmt.Sprintf("server id:%d,log length:%d,commitIdx:%d",rf.me,len(rf.log),rf.commitIndex))
 	//
 	//	}
 	//
 	//}()
-	// Your initialization code here (2A, 2B, 2C).
-	//log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
-	// initialize from state persisted before a crash
+
 
 	return rf
 }

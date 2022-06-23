@@ -162,7 +162,6 @@ func (rf *Raft) startElection() {
 		DPrintf("become leader, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.changeRole(Leader)
 	}else {
-		//DPrintf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.resetElectionTimer()
 	}
 	//DPrintf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))

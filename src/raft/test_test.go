@@ -836,9 +836,6 @@ func TestFigure8Unreliable2C(t *testing.T) {
 		}
 	}
 	//debug
-	for i:=0;i<servers ;i++  {
-		cfg.rafts[i].printState()
-	}
 
 	cfg.one(rand.Int()%10000, servers, true)
 

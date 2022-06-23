@@ -34,7 +34,7 @@ func (rf *Raft) getAppendLogs(idx int) []Log {
 	if idx==rf.me {
 		panic("can't append log to self")
 	}
-	nid:=rf.nextIndex[idx]
+	nid:=rf.getLogIdxByRealIdx(rf.nextIndex[idx])
 	return rf.log[nid:]
 }
 
@@ -42,7 +42,6 @@ func (rf *Raft) getAppendLogs(idx int) []Log {
 //
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	// Your code here (2A, 2B).
-
 	rf.lock("dealingAppendEntries")
 	defer rf.unlock("dealingAppendEntries")
 
@@ -65,23 +64,26 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	//condition2
 	prevLogidx:=args.PrevLogIndex
-	if prevLogidx>= len(rf.log) {
+	//prevLogidx对应的目前的idx 如果为0 ，理论上也可以，因为term=lastsnapshot
+	realPrevIdx:=rf.getLogIdxByRealIdx(prevLogidx)
+	if realPrevIdx>= len(rf.log){
 		DPrintf("dealing append entries fail1 server id:%d, log start:%d,log len:%d,success:%v,rf log len:%d,time:%v\n",rf.me,args.PrevLogIndex,len(args.Entries),reply.Success, len(rf.log),time.Now().Sub(rf.startTime))
-		reply.ConflictIndex=len(rf.log)
-
-		//reply.NextIndex=prevLogidx
+		reply.ConflictIndex=len(rf.log)+rf.lastSnapshotIdx
 		return
 	}
-	if prevLogidx!=0&&rf.log[prevLogidx].Term!=args.PrevLogTerm {
+	if rf.log[realPrevIdx].Term!=args.PrevLogTerm {
 		DPrintf("dealing append entries fail2 server id:%d, log start:%d,log len:%d,success:%v,time:%v\n",rf.me,args.PrevLogIndex,len(args.Entries),reply.Success,time.Now().Sub(rf.startTime))
 		//skip a term
-		for i:=prevLogidx;i>=0 ;i--  {
-			if rf.log[i].Term!=rf.log[prevLogidx].Term {
-				reply.ConflictIndex=i+1
+		for i:=realPrevIdx;i>=0 ;i--  {
+			if rf.log[i].Term!=rf.log[realPrevIdx].Term {
+				reply.ConflictIndex=i+1+rf.lastSnapshotIdx
 				break
 			}
 		}
-		reply.ConflictTerm=rf.log[prevLogidx].Term
+		if reply.ConflictIndex==0 {
+			reply.ConflictIndex=1+rf.lastSnapshotIdx
+		}
+		reply.ConflictTerm=rf.log[realPrevIdx].Term
 		return
 	}
 
@@ -91,12 +93,12 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 
 	//condition3,4
-	rf.log=rf.log[:prevLogidx+1]
+	rf.log=rf.log[:realPrevIdx+1]
 	rf.log=append(rf.log,args.Entries...)
 	rf.persist()
 	//condition5
 	leadercommit:=args.LeaderCommit
-	theLastEntryIdx:= len(rf.log)-1
+	theLastEntryIdx:= len(rf.log)-1+rf.lastSnapshotIdx
 	if rf.commitIndex<leadercommit {
 		if leadercommit<theLastEntryIdx {
 			rf.commitIndex=leadercommit
@@ -116,6 +118,14 @@ func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 		rf.unlock("appendEntries")
 		return false
 	}
+
+	//nextIndex[idx] < lastSnapshotIdx => use snapshot instead of entries
+	if rf.nextIndex[idx]<rf.lastSnapshotIdx {
+		go rf.sendSnapshot(idx)
+		rf.unlock("appendEntries")
+		return true
+	}
+
 	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut*time.Millisecond)
 	defer toleranceTimer.Stop()
 	args:=&AppendEntriesArgs{}
@@ -126,11 +136,8 @@ func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 	args.Term=rf.currentTerm
 	args.Entries=rf.getAppendLogs(idx)
 	args.PrevLogIndex=rf.nextIndex[idx]-1
-	if args.PrevLogIndex>=0 {
-		args.PrevLogTerm=rf.log[args.PrevLogIndex].Term
-	}else {
-		args.PrevLogTerm=0
-	}
+	prevLogidx2Realidx:=rf.getLogIdxByRealIdx(args.PrevLogIndex)
+	args.PrevLogTerm=rf.log[prevLogidx2Realidx].Term
 
 	DPrintf("leader append entries server id:%d,role:%d, term:%d ,target idx:%d,log start:%d,log length:%d,time:%v\n",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex,len(args.Entries),time.Now().Sub(rf.startTime))
 	rf.appendEntriesTimers[idx].Reset(HeartBeatTimeOut*time.Millisecond)
@@ -165,37 +172,33 @@ func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 					term:=reply.Term
 					success:=reply.Success
 					if !success {
-						//DPrintf("target id and term: %d, %d\n",idx,term)
 						if term>rf.currentTerm {
 							DPrintf("term less than target,turn to follower\n")
 							rf.currentTerm=term
 							rf.persist()
 							rf.changeRole(Follower)
-							//return ok
 						}else {
 							//target server refuse logs, reduce log idx
 							DPrintf("target server refuse logs,target id:%d,reply term:%d,\n",idx,reply.Term)
-							//rf.nextIndex[idx]--;
 							conTerm:=reply.ConflictTerm
 							if conTerm==-1 {
 								rf.nextIndex[idx]=reply.ConflictIndex
 							}else {
 								find:=false
-								for i:=args.PrevLogIndex;i>=0 ;i--  {
+								for i:=args.PrevLogIndex-rf.lastSnapshotIdx;i>=0 ;i--  {
 									if rf.log[i].Term==conTerm {
-										rf.nextIndex[idx]=i+1
+										rf.nextIndex[idx]=i+1+rf.lastSnapshotIdx
 										find=true
 										break
 									}
 								}
 								if !find {
 									rf.nextIndex[idx]=reply.ConflictIndex
-									rf.nextIndex[idx]=reply.ConflictIndex
 								}
 							}
 							rf.appendEntriesTimers[idx].Reset(0)
 						}
-					}else {
+					} else {
 						nextidx:=rf.nextIndex[idx]+ len(args.Entries)
 						rf.nextIndex[idx]=nextidx
 						rf.matchedIndex[idx]=nextidx-1
@@ -225,7 +228,9 @@ func (rf *Raft) updateCommitIndex() {
 
 	sort.Ints(temp)
 	//4:1;5:2
-	//matchedindex中位数，如果term=本期term 则可以提交，如果term小于本期term则不更新（因为考虑到term一定递增，前面也不可能有符合的出现）
+	//matchedindex中位数，如果term=本期term 则可以提交，
+	// 如果term小于本期term则不更新（
+	// 因为考虑到term一定递增，前面也不可能有符合的出现）
 	median:=temp[(len(rf.peers)-1)/2]
 	if median>rf.commitIndex&& rf.log[median].Term==rf.currentTerm{
 		rf.commitIndex=median

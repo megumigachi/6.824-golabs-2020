@@ -297,7 +297,7 @@ func (kv *KVServer) readApplych() {
 				//todo:invalid command? snapshot?
 			}
 			//尝试生成快照
-			kv.saveDataToSnapshot()
+			kv.Snapshot(idx)
 		}
 	}
 
@@ -308,7 +308,9 @@ func (kv *KVServer)PrintStateMachine()  {
 }
 
 //尝试将data写入snapshot
-func (kv *KVServer) saveDataToSnapshot()  {
+func (kv *KVServer) Snapshot(lastIdx int)  {
+	kv.lock("snapshot")
+	defer kv.unlock()
 	raftSize:=kv.persister.RaftStateSize()
 	if kv.maxraftstate==-1 {
 		return
@@ -317,14 +319,14 @@ func (kv *KVServer) saveDataToSnapshot()  {
 		return
 	}
 
-	//snapshotBytes:=kv.generateSnapshotData()
-	//todo: raft
-
+	//snapshotBytes:=kv.generateSnapshot()
+	//todo: send snapshot to raft
+	kv.rf.SaveSnapshotAndState(lastIdx,kv.generateSnapshot())
 }
 
 
 //生成快照
-func (kv *KVServer) generateSnapshotData() []byte {
+func (kv *KVServer) generateSnapshot() []byte {
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
 	if err := e.Encode(kv.stateMachine); err != nil {
@@ -335,6 +337,13 @@ func (kv *KVServer) generateSnapshotData() []byte {
 	}
 	data := w.Bytes()
 	return data
+}
+
+
+func (kv *KVServer) applySnapshot(){
+	kv.lock("snapshot")
+	defer kv.unlock()
+	kv.readPersist(kv.persister.ReadSnapshot())
 }
 
 //读取快照
@@ -357,6 +366,9 @@ func (kv *KVServer) readPersist(data []byte) {
 		kv.resultMap = resultMap
 	}
 }
+
+
+
 
 //
 // servers[] contains the ports of the set of
@@ -386,16 +398,21 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.applyCh = make(chan raft.ApplyMsg)
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
 	// You may need initialization code here.
-	kv.stopch=make(chan int)
-	kv.stateMachine=StateMachine{
-		data:make(map[string]string),
-	}
 	kv.ResponseChans=make(map[int]chan ResponseMessage)
-	kv.resultMap=make(map[int64]ResponseRecord)
+
 
 	kv.startTime=time.Now()
 
 	kv.persister=persister
+
+	if kv.persister.SnapshotSize()==0 {
+		kv.stateMachine=StateMachine{
+			data:make(map[string]string),
+		}
+		kv.resultMap=make(map[int64]ResponseRecord)
+	}else {
+		kv.applySnapshot()
+	}
 
 	go func() {
 		kv.readApplych()
