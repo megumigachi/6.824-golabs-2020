@@ -61,8 +61,8 @@ const (
 const (
 	ElectionTimeout=300
 	HeartBeatTimeOut=100
-	RpcToleranceTimeOut=100
-	ApplyTimeOut=100
+	RpcToleranceTimeOut=80
+	ApplyTimeOut=50
 )
 
 type Raft struct {
@@ -317,6 +317,21 @@ func (rf *Raft) initLeaderProperties() {
 func (rf *Raft) applyLogs() {
 	rf.lock("apply logs")
 	rf.applyTimer.Reset(ApplyTimeOut*time.Millisecond)
+	if rf.lastApplied<rf.lastSnapshotIdx {
+		msg:=ApplyMsg{
+			CommandValid: false,
+			Command:      "install_snapshot",
+			CommandIndex: 0,
+		}
+		rf.unlock("apply logs")
+		go func() {
+			rf.applyMutex.Lock()
+			rf.applyCh<-msg
+			rf.applyMutex.Unlock()
+		}()
+		return
+	}
+
 	if rf.lastApplied>rf.commitIndex {
 		panic("apply an uncommitted index ")
 	}else if rf.lastApplied==rf.commitIndex{
@@ -332,7 +347,7 @@ func (rf *Raft) applyLogs() {
 			applymsg := ApplyMsg{
 				true,
 				command,
-				index,
+				rf.lastApplied,
 			}
 			msgs=append(msgs,applymsg)
 			//DPrintf("server id:%d ,apply log id:%d",rf.me,index)

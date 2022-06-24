@@ -52,7 +52,7 @@ type KVServer struct {
 
 	lockName string
 
-	stateMachine StateMachine
+	StateMachine StateMachine
 
 	stopch chan int	//用于传递kill信号
 
@@ -62,6 +62,10 @@ type KVServer struct {
 
 	persister *raft.Persister
 	// Your definitions here.
+}
+
+func (kv *KVServer) PrintState()  {
+
 }
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
@@ -249,13 +253,13 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 	}
 
 	if op.Operation==OP_GET {
-		v,err:=kv.stateMachine.Get(op.Key)
+		v,err:=kv.StateMachine.Get(op.Key)
 		responseMsg.Err= Err(err)
 		responseMsg.Value=v
 	}else if op.Operation==OP_Put {
-		kv.stateMachine.Put(op.Key,op.Value)
+		kv.StateMachine.Put(op.Key,op.Value)
 	}else if op.Operation==OP_Append {
-		kv.stateMachine.Append(op.Key,op.Value)
+		kv.StateMachine.Append(op.Key,op.Value)
 	}else {
 		panic("wrong op?")
 	}
@@ -294,7 +298,10 @@ func (kv *KVServer) readApplych() {
 				}
 				kv.unlock()
 			}else {
-				//todo:invalid command? snapshot?
+				//snapshot?
+				kv.lock("apply snapshot")
+				kv.applySnapshot()
+				kv.unlock()
 			}
 			//尝试生成快照
 			kv.Snapshot(idx)
@@ -304,7 +311,7 @@ func (kv *KVServer) readApplych() {
 }
 
 func (kv *KVServer)PrintStateMachine()  {
-	log.Printf("kvserver :%d, statemachine %v",kv.me,kv.stateMachine.data)
+	log.Printf("kvserver :%d, statemachine %v",kv.me,kv.StateMachine.Data)
 }
 
 //尝试将data写入snapshot
@@ -329,7 +336,7 @@ func (kv *KVServer) Snapshot(lastIdx int)  {
 func (kv *KVServer) generateSnapshot() []byte {
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
-	if err := e.Encode(kv.stateMachine); err != nil {
+	if err := e.Encode(kv.StateMachine); err != nil {
 		panic(err)
 	}
 	if err := e.Encode(kv.resultMap); err != nil {
@@ -341,8 +348,7 @@ func (kv *KVServer) generateSnapshot() []byte {
 
 
 func (kv *KVServer) applySnapshot(){
-	kv.lock("snapshot")
-	defer kv.unlock()
+
 	kv.readPersist(kv.persister.ReadSnapshot())
 }
 
@@ -362,7 +368,7 @@ func (kv *KVServer) readPersist(data []byte) {
 		d.Decode(&resultMap) != nil {
 		log.Fatal("kv read persist err")
 	} else {
-		kv.stateMachine = stateMachine
+		kv.StateMachine = stateMachine
 		kv.resultMap = resultMap
 	}
 }
@@ -406,8 +412,8 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.persister=persister
 
 	if kv.persister.SnapshotSize()==0 {
-		kv.stateMachine=StateMachine{
-			data:make(map[string]string),
+		kv.StateMachine =StateMachine{
+			Data: make(map[string]string),
 		}
 		kv.resultMap=make(map[int64]ResponseRecord)
 	}else {

@@ -111,19 +111,19 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 }
 
-func (rf* Raft) appendEntriesToFollower(idx int)  bool{
+func (rf* Raft) appendEntriesToFollower(idx int)  {
 	rf.lock("appendEntries")
 	//也许是记录中的timer bug所导致，只能验证当前角色，不是leader则丢弃这次操作（很不优雅的实现，也许教授说的对，真的应该抛弃leader）
 	if rf.role!=Leader{
 		rf.unlock("appendEntries")
-		return false
+		return
 	}
 
 	//nextIndex[idx] < lastSnapshotIdx => use snapshot instead of entries
 	if rf.nextIndex[idx]<rf.lastSnapshotIdx {
 		go rf.sendSnapshot(idx)
 		rf.unlock("appendEntries")
-		return true
+		return
 	}
 
 	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut*time.Millisecond)
@@ -159,14 +159,14 @@ func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 	for   {
 		select {
 			case <-rf.stopSignal:
-				return false
+				return
 			case <-toleranceTimer.C:
-				return false;
+				return ;
 			case ok:=<-boolchan:{
 				rf.lock("appendEntries_2")
 				defer rf.unlock("appendEntries_2")
 				if rf.role!=Leader {
-					return ok
+					return
 				}
 				if ok {
 					term:=reply.Term
@@ -208,7 +208,7 @@ func (rf* Raft) appendEntriesToFollower(idx int)  bool{
 					DPrintf("append entries network failed, server id :%d, time: %v",rf.me, time.Now().Sub(rf.startTime))
 					rf.appendEntriesTimers[idx].Reset(10*time.Millisecond)
 				}
-				return ok
+				return
 			}
 		}
 	}
@@ -232,7 +232,7 @@ func (rf *Raft) updateCommitIndex() {
 	// 如果term小于本期term则不更新（
 	// 因为考虑到term一定递增，前面也不可能有符合的出现）
 	median:=temp[(len(rf.peers)-1)/2]
-	if median>rf.commitIndex&& rf.log[median].Term==rf.currentTerm{
+	if median>rf.commitIndex&& rf.log[rf.getLogIdxByRealIdx(median)].Term==rf.currentTerm{
 		rf.commitIndex=median
 	}
 }

@@ -1,11 +1,11 @@
 package kvraft
 
 type StateMachine struct {
-	data map[string]string
+	Data map[string]string
 }
 
 func (sm *StateMachine)Get(key string)(string,string)  {
-	if v,ok:=sm.data[key];ok {
+	if v,ok:=sm.Data[key];ok {
 		return v,OK
 	}else{
 		return "",ErrNoKey
@@ -13,14 +13,14 @@ func (sm *StateMachine)Get(key string)(string,string)  {
 }
 
 func (sm *StateMachine)Put(key string,value string)  {
-	sm.data[key]=value
+	sm.Data[key]=value
 }
 
 func(sm* StateMachine)Append(key string,value string){
-	if _,ok:=sm.data[key];ok {
-		sm.data[key]+=value
+	if _,ok:=sm.Data[key];ok {
+		sm.Data[key]+=value
 	}else{
-		sm.data[key]=value
+		sm.Data[key]=value
 	}
 }
 
