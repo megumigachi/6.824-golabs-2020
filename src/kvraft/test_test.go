@@ -662,6 +662,12 @@ func TestSnapshotRPC3B(t *testing.T) {
 
 	// now make group that requires participation of
 	// lagging server, so that it has to catch up.
+
+
+	fmt.Println("print_state")
+	for i:=0;i<nservers ;i++  {
+		cfg.kvservers[i].PrintState()
+	}
 	cfg.partition([]int{0, 2}, []int{1})
 	{
 		ck1 := cfg.makeClient([]int{0, 2})
@@ -674,7 +680,14 @@ func TestSnapshotRPC3B(t *testing.T) {
 	}
 
 	// now everybody
+
+	fmt.Println("print_state_2")
+	for i:=0;i<nservers ;i++  {
+		cfg.kvservers[i].PrintState()
+	}
 	cfg.partition([]int{0, 1, 2}, []int{})
+
+
 
 	Put(cfg, ck, "e", "E")
 	check(cfg, t, ck, "c", "C")

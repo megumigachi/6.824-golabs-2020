@@ -76,7 +76,7 @@ func (ck *Clerk) Get(key string) string {
 			Value: "",
 		}
 		leaderId:=ck.serverLeaderId
-		DPrintf("client get , client id %d , key %v,cmd id :%v", ck.clientId,key,ck.commandId)
+		//DPrintf("client get , client id %d , key %v,cmd id :%v", ck.clientId,key,ck.commandId)
 
 		ok:=ck.servers[leaderId].Call("KVServer.Get", &args, &reply)
 		//失败重传?
@@ -90,7 +90,7 @@ func (ck *Clerk) Get(key string) string {
 
 
 		success:=reply.Err
-		DPrintf("client get result , client id %d,  command id %v, result %v time %v", ck.clientId,ck.commandId,success,time.Now().Sub(ck.startTime))
+		//DPrintf("client get result , client id %d,  command id %v, result %v time %v", ck.clientId,ck.commandId,success,time.Now().Sub(ck.startTime))
 
 		if success==OK {
 			ck.serverLeaderId=leaderId
@@ -138,7 +138,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		reply:=PutAppendReply{Err:""}
 
 		leaderId:=ck.serverLeaderId
-		DPrintf("client put append , client id %d, op %v, key %v, value %v , commandid %v time %v", ck.clientId,op,key,value,ck.commandId,time.Now().Sub(ck.startTime))
+		//DPrintf("client put append , client id %d, op %v, key %v, value %v , commandid %v time %v", ck.clientId,op,key,value,ck.commandId,time.Now().Sub(ck.startTime))
 		ok:=ck.servers[leaderId].Call("KVServer.PutAppend", &args, &reply)
 
 		if !ok {
@@ -148,7 +148,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		}
 
 		err:=reply.Err
-		DPrintf("client put append result , client id %d,  command id %v, result %v time %v", ck.clientId,ck.commandId,err,time.Now().Sub(ck.startTime))
+		//DPrintf("client put append result , client id %d,  command id %v, result %v time %v", ck.clientId,ck.commandId,err,time.Now().Sub(ck.startTime))
 		if err==ErrWrongLeader {
 			time.Sleep(RequestIntervel)
 			ck.serverLeaderId=(leaderId+1)%len(ck.servers)

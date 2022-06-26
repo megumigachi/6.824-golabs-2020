@@ -67,12 +67,12 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	//prevLogidx对应的目前的idx 如果为0 ，理论上也可以，因为term=lastsnapshot
 	realPrevIdx:=rf.getLogIdxByRealIdx(prevLogidx)
 	if realPrevIdx>= len(rf.log){
-		DPrintf("dealing append entries fail1 server id:%d, log start:%d,log len:%d,success:%v,rf log len:%d,time:%v\n",rf.me,args.PrevLogIndex,len(args.Entries),reply.Success, len(rf.log),time.Now().Sub(rf.startTime))
+		DPrintf("dealing append entries fail1 server id:%d, log start:%d,log len:%d,success:%v,rf log len:%d,time:%v\n",rf.me,args.PrevLogIndex+1,len(args.Entries),reply.Success, len(rf.log),time.Now().Sub(rf.startTime))
 		reply.ConflictIndex=len(rf.log)+rf.lastSnapshotIdx
 		return
 	}
 	if rf.log[realPrevIdx].Term!=args.PrevLogTerm {
-		DPrintf("dealing append entries fail2 server id:%d, log start:%d,log len:%d,success:%v,time:%v\n",rf.me,args.PrevLogIndex,len(args.Entries),reply.Success,time.Now().Sub(rf.startTime))
+		DPrintf("dealing append entries fail2 server id:%d, log start:%d,log len:%d,success:%v,time:%v\n",rf.me,args.PrevLogIndex+1,len(args.Entries),reply.Success,time.Now().Sub(rf.startTime))
 		//skip a term
 		for i:=realPrevIdx;i>=0 ;i--  {
 			if rf.log[i].Term!=rf.log[realPrevIdx].Term {
@@ -119,8 +119,9 @@ func (rf* Raft) appendEntriesToFollower(idx int)  {
 		return
 	}
 
-	//nextIndex[idx] < lastSnapshotIdx => use snapshot instead of entries
-	if rf.nextIndex[idx]<rf.lastSnapshotIdx {
+	//nextIndex[idx] <=lastSnapshotIdx => use snapshot instead of entries
+	//注意這裡的等號
+	if rf.nextIndex[idx]<=rf.lastSnapshotIdx {
 		go rf.sendSnapshot(idx)
 		rf.unlock("appendEntries")
 		return
@@ -139,7 +140,7 @@ func (rf* Raft) appendEntriesToFollower(idx int)  {
 	prevLogidx2Realidx:=rf.getLogIdxByRealIdx(args.PrevLogIndex)
 	args.PrevLogTerm=rf.log[prevLogidx2Realidx].Term
 
-	DPrintf("leader append entries server id:%d,role:%d, term:%d ,target idx:%d,log start:%d,log length:%d,time:%v\n",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex,len(args.Entries),time.Now().Sub(rf.startTime))
+	DPrintf("leader append entries server id:%d,role:%d, term:%d ,target idx:%d,log start:%d,log length:%d,time:%v\n",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex+1,len(args.Entries),time.Now().Sub(rf.startTime))
 	rf.appendEntriesTimers[idx].Reset(HeartBeatTimeOut*time.Millisecond)
 	rf.unlock("appendEntries")
 

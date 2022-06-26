@@ -20,6 +20,8 @@ package raft
 import (
 	"../labgob"
 	"bytes"
+	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -76,7 +78,7 @@ type Raft struct {
 
 	role     int
 	lockName string
-	// Your data here (2A, 2B, 2C).
+	// Your Data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
 	currentTerm int
@@ -251,7 +253,7 @@ func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
 
 
 func (rf* Raft) changeRole(role int)  {
-	//DPrintf("change role: serverid: %d,changerole %d, time:%v \n",rf.me,role,rf.getTimeLine())
+	DPrintf("[change role %d][from %d to %d] time:%v \n",rf.me,rf.role,role,rf.getTimeLine())
 
 	// prepare for election
 	if role ==Candidate {
@@ -297,7 +299,11 @@ func (rf* Raft) changeRole(role int)  {
 
 }
 
-
+func(rf * Raft)PrintState(){
+	rf.lock("print_s")
+	defer rf.unlock("print_s")
+	DPrintf("[log length %d][last snapshot idx %d][term %d][role %d][commitidx %d][last applied %d]", len(rf.log),rf.lastSnapshotIdx,rf.currentTerm,rf.role,rf.commitIndex,rf.lastApplied)
+}
 
 func (rf *Raft) getTimeLine() time.Duration {
 	return time.Now().Sub(rf.startTime)
@@ -323,6 +329,7 @@ func (rf *Raft) applyLogs() {
 			Command:      "install_snapshot",
 			CommandIndex: 0,
 		}
+		rf.lastApplied=rf.lastSnapshotIdx
 		rf.unlock("apply logs")
 		go func() {
 			rf.applyMutex.Lock()
@@ -416,7 +423,7 @@ func (rf *Raft) getLogIdxAndTermByRealIdx(i int)(int,int)  {
 
 func (rf* Raft) getLogIdxByRealIdx(i int) int{
 	if i<rf.lastSnapshotIdx {
-		panic("index < last snap index")
+		log.Panicf("raft %d index %d < last snap index %d",rf.me,i,rf.lastSnapshotIdx)
 	}
 	return i-rf.lastSnapshotIdx
 }
@@ -536,15 +543,15 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	}()
 
 	//debug : watching lockName
-	//go func() {
-	//	for !rf.killed() {
-	//		time.Sleep(time.Millisecond * 300)
-	//		//log.Println(fmt.Sprintf("server id:%d,lock:%s, time:%v", rf.me,rf.lockName, time.Now().Sub(rf.startTime)))
-	//		//log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
-	//
-	//	}
-	//
-	//}()
+	go func() {
+		for !rf.killed() {
+			time.Sleep(time.Second*1)
+			log.Println(fmt.Sprintf("server id:%d,lock:%s, time:%v", rf.me,rf.lockName, time.Now().Sub(rf.startTime)))
+			log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
+
+		}
+
+	}()
 
 
 	return rf

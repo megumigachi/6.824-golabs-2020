@@ -10,7 +10,7 @@ import (
 // field names must start with capital letters!
 //
 type RequestVoteArgs struct {
-	// Your data here (2A, 2B).
+	// Your Data here (2A, 2B).
 	Term int
 	CandidateId int
 	LastLogIndex int
@@ -22,7 +22,7 @@ type RequestVoteArgs struct {
 // field names must start with capital letters!
 //
 type RequestVoteReply struct {
-	// Your data here (2A).
+	// Your Data here (2A).
 	Term int
 	VoteGranted bool
 }
@@ -75,6 +75,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 
 func (rf *Raft) resetElectionTimer() {
+	DPrintf("[%d reset election timer]",rf.me)
 	rf.electionTimer.Stop();
 	rf.electionTimer.Reset(rf.generateRandomElectionTimeOut())
 }
@@ -84,7 +85,7 @@ func (rf *Raft) startElection() {
 	//解决死锁：减小粒度
 	rf.lock("startElection")
 	rf.changeRole(Candidate)
-	DPrintf("start election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+	DPrintf("start election, id:%d, term:%d,role :%d, time:%v",rf.me,rf.currentTerm,rf.role,time.Now().Sub(rf.startTime))
 
 	//是否需要defer?
 	//defer rf.resetElectionTimer()
@@ -114,8 +115,6 @@ func (rf *Raft) startElection() {
 		wg.Add(1)
 		go func() {
 			flag:=rf.sendRequestVote(idx,reqArg,reqReply)
-			//fmt.Printf("self-id:%d,target-id:%d,flag:%t\n",rf.me,idx,flag)
-			//network failure
 			if !flag {
 				replyMu.Lock()
 				//DPrintf("not receive vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
@@ -162,6 +161,7 @@ func (rf *Raft) startElection() {
 		DPrintf("become leader, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.changeRole(Leader)
 	}else {
+		DPrintf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
 		rf.resetElectionTimer()
 	}
 	//DPrintf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))

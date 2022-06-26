@@ -6,11 +6,11 @@ import (
 )
 
 type InstallSnapshotArgs struct {
-	Term int
-	LeaderId int
-	LastIncludedIdx int
+	Term             int
+	LeaderId         int
+	LastIncludedIdx  int
 	LastIncludedTerm int
-	data []byte
+	Data             []byte
 }
 
 type InstallSnapshotReply struct {
@@ -24,6 +24,7 @@ func (rf *Raft)SaveSnapshotAndState(lastLogIdx int, snapshot []byte)  {
 	rf.lock("save_snapshot")
 	defer rf.unlock("save_snapshot")
 
+	DPrintf("[raft SaveSnapshotAndState %d][lastidx %d][snapshot size %d]",rf.me,lastLogIdx, len(snapshot))
 	// 为什么会传一个更小的快照？
 	// 相当于已提交的日志被撤销了，怎么都不可能
 	if rf.lastSnapshotIdx>=lastLogIdx {
@@ -56,7 +57,7 @@ func (rf *Raft) sendSnapshot (idx int) {
 		LeaderId:         rf.me,
 		LastIncludedIdx:  rf.lastSnapshotIdx,
 		LastIncludedTerm: rf.lastSnapshotTerm,
-		data:             rf.persister.ReadSnapshot(),
+		Data:             rf.persister.ReadSnapshot(),
 	}
 	reply:=&InstallSnapshotReply{
 		Term:-1,
@@ -64,7 +65,7 @@ func (rf *Raft) sendSnapshot (idx int) {
 	boolChan:=make(chan bool)
 	rpcTimer:=time.NewTimer(RpcToleranceTimeOut*time.Millisecond)
 	rf.appendEntriesTimers[idx].Reset(HeartBeatTimeOut*time.Millisecond)
-	DPrintf("[install snapshot][server id %d][target id %d][last idx %d]",rf.me,idx,rf.lastSnapshotIdx)
+	DPrintf("[install snapshot][server id %d][target id %d][last idx %d][snapshot size %d]",rf.me,idx,rf.lastSnapshotIdx,len(args.Data))
 	rf.unlock("sendSnapshot")
 	go func() {
 		ok:=rf.peers[idx].Call("Raft.InstallSnapshot", args, reply)
@@ -73,6 +74,7 @@ func (rf *Raft) sendSnapshot (idx int) {
 
 	select {
 		case <-rpcTimer.C:{
+			DPrintf("[install snapshot %d][target %d] rpc timeout ",rf.me,idx)
 			return
 		}
 		case <-rf.stopSignal:
@@ -91,12 +93,14 @@ func (rf *Raft) sendSnapshot (idx int) {
 					rf.persist()
 					rf.changeRole(Follower)
 				}else {
+					DPrintf("[install snapshot success %d][target id %d]",rf.me,idx)
 					//默认更新成功
 					rf.nextIndex[idx]=rf.lastSnapshotIdx+1
 					rf.matchedIndex[idx]=rf.lastSnapshotIdx
 					rf.updateCommitIndex()
 				}
 			}else {
+				DPrintf("[install snapshot %d][target %d] network failed ",rf.me,idx)
 				rf.appendEntriesTimers[idx].Reset(10*time.Millisecond)
 			}
 		}
@@ -112,6 +116,10 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	所以先设置一个panic在这里*/
 	rf.lock("install_snapshot")
 	defer rf.unlock("install_snapshot")
+
+	leaderId:=args.LeaderId
+	DPrintf("[receive install snapshot %d][from %d][lastidx %d][received Data len %d]",rf.me,leaderId,args.LastIncludedIdx,len(args.Data))
+
 
 	reply.Term=rf.currentTerm
 
@@ -132,7 +140,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	beginIdx:=rf.getLogIdxByRealIdx(args.LastIncludedIdx)
 	newLog:=make([]Log,0)
 	newLog=append(newLog, Log{
-		Term:    rf.currentTerm,
+		Term:    args.LastIncludedTerm, //这里把lastSnapshotTerm填充进去，实际上只是为了一致性检查方便点
 		Index:   0,
 		Command: nil,
 	})
@@ -145,5 +153,5 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	rf.lastSnapshotIdx=args.LastIncludedIdx
 	rf.lastSnapshotTerm=args.LastIncludedTerm
 	rf.commitIndex=rf.lastSnapshotIdx
-	rf.persister.SaveStateAndSnapshot(rf.generatePersistData(),args.data)
+	rf.persister.SaveStateAndSnapshot(rf.generatePersistData(),args.Data)
 }

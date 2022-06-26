@@ -65,6 +65,11 @@ type KVServer struct {
 }
 
 func (kv *KVServer) PrintState()  {
+	kv.lock("printstate")
+	defer kv.unlock()
+	DPrintf("[kv printState %d]",kv.me)
+	kv.PrintStateMachine()
+	kv.rf.PrintState()
 
 }
 
@@ -300,7 +305,13 @@ func (kv *KVServer) readApplych() {
 			}else {
 				//snapshot?
 				kv.lock("apply snapshot")
+				DPrintf("[kv apply snapshot from leader %d before]",kv.me)
+				kv.PrintStateMachine()
+				kv.rf.PrintState()
 				kv.applySnapshot()
+				DPrintf("[kv apply snapshot from leader %d after]",kv.me)
+				kv.PrintStateMachine()
+				kv.rf.PrintState()
 				kv.unlock()
 			}
 			//尝试生成快照
@@ -311,7 +322,7 @@ func (kv *KVServer) readApplych() {
 }
 
 func (kv *KVServer)PrintStateMachine()  {
-	log.Printf("kvserver :%d, statemachine %v",kv.me,kv.StateMachine.Data)
+	DPrintf("[kvserver :%d][statemachine %v]",kv.me,kv.StateMachine.Data)
 }
 
 //尝试将data写入snapshot
