@@ -141,7 +141,7 @@ func (rf* Raft) appendEntriesToFollower(idx int)  {
 	prevLogidx2Realidx:=rf.getLogIdxByRealIdx(args.PrevLogIndex)
 	args.PrevLogTerm=rf.log[prevLogidx2Realidx].Term
 
-	DPrintf("[rf %d][leader append entries][role:%d][term:%d][target idx:%d][log start:%d][log length %d]",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex+1,len(args.Entries))
+	DPrintf("[rf %d][leader append entries][role:%d][term:%d][target idx:%d][log start:%d][log length %d][time %v]",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex+1,len(args.Entries),rf.getTimeLine())
 	rf.appendEntriesTimers[idx].Reset(HeartBeatTimeOut*time.Millisecond)
 	rf.unlock("appendEntries")
 

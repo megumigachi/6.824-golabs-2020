@@ -63,7 +63,7 @@ const (
 	ElectionTimeout=300
 	HeartBeatTimeOut=100
 	RpcToleranceTimeOut=80
-	ApplyTimeOut=30
+	ApplyTimeOut=50
 )
 
 type Raft struct {
@@ -154,6 +154,9 @@ func (rf* Raft) lock(name string){
 
 func (rf* Raft) unlock(name string){
 	defer rf.mu.Unlock()
+	if time.Now().Sub(rf.lockTime)>5*time.Millisecond {
+		DPrintf("[rf %d][locktime too long %v][lockname %v]",rf.me,time.Now().Sub(rf.lockTime),rf.lockTime)
+	}
 	rf.lockName=""
 }
 
@@ -194,15 +197,14 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		newLog.Command=command
 		rf.log=append(rf.log, newLog)
 		rf.persist()
-		DPrintf("[rf %d][start agreement][return index %d][command %v]", rf.me,index+1,command)
+		DPrintf("[rf %d][start agreement][return index %d][command %v][time %v]", rf.me,index+1,command,time.Now().Sub(rf.startTime))
 		//对于每一个server立即发送一条append entry 请求
 		for i:=0;i<rf.me;i++ {
 			if rf.me==i{
 				continue
 			}
-			t:=rf.appendEntriesTimers[i]
-			t.Stop()
-			t.Reset(0)
+			rf.appendEntriesTimers[i].Stop()
+			rf.appendEntriesTimers[i].Reset(0)
 		}
 
 	}
@@ -342,7 +344,7 @@ func (rf *Raft) applyLogs() {
 		rf.unlock("apply logs")
 		return
 	}else {
-		DPrintf("[rf %d][start applying logs][from %d][to %d] ",rf.me,rf.lastApplied+1,rf.commitIndex)
+		DPrintf("[rf %d][start applying logs][from %d][to %d][time %v]",rf.me,rf.lastApplied+1,rf.commitIndex,rf.getTimeLine())
 		msgs:=make([]ApplyMsg,0)
 		for rf.lastApplied<rf.commitIndex  {
 			rf.lastApplied++
