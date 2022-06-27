@@ -635,7 +635,6 @@ func TestSnapshotRPC3B(t *testing.T) {
 	maxraftstate := 1000
 	cfg := make_config(t, nservers, false, maxraftstate)
 	defer cfg.cleanup()
-	go printTimeLine()
 	ck := cfg.makeClient(cfg.All())
 
 	cfg.begin("Test: InstallSnapshot RPC (3B)")
@@ -692,6 +691,7 @@ func TestSnapshotRPC3B(t *testing.T) {
 // are the snapshots not too huge? 500 bytes is a generous bound for the
 // operations we're doing here.
 func TestSnapshotSize3B(t *testing.T) {
+	go printTimeLine()
 	const nservers = 3
 	maxraftstate := 1000
 	maxsnapshotstate := 500
