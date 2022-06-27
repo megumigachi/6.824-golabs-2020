@@ -75,7 +75,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 
 func (rf *Raft) resetElectionTimer() {
-	DPrintf("[%d reset election timer]",rf.me)
+	DPrintf("[rf %d][reset election timer]",rf.me)
 	rf.electionTimer.Stop();
 	rf.electionTimer.Reset(rf.generateRandomElectionTimeOut())
 }
@@ -85,7 +85,7 @@ func (rf *Raft) startElection() {
 	//解决死锁：减小粒度
 	rf.lock("startElection")
 	rf.changeRole(Candidate)
-	DPrintf("start election, id:%d, term:%d,role :%d, time:%v",rf.me,rf.currentTerm,rf.role,time.Now().Sub(rf.startTime))
+	DPrintf("[rf %d][start election][term %d][role %d]",rf.me,rf.currentTerm,rf.role)
 
 	//是否需要defer?
 	//defer rf.resetElectionTimer()
@@ -117,13 +117,13 @@ func (rf *Raft) startElection() {
 			flag:=rf.sendRequestVote(idx,reqArg,reqReply)
 			if !flag {
 				replyMu.Lock()
-				//DPrintf("not receive vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
+				DPrintf("[rf %d][not receive vote result][target id %d]",rf.me,idx)
 				replys=append(replys, reqReply)
 				replyMu.Unlock()
 
 			}else {
 				replyMu.Lock()
-				//DPrintf("received vote result, server id:%d,target id:%d,my term:%d,reply term:%d,vote granted:%v\n",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
+				DPrintf("[rf %d][received vote result][target id %d][my term %d][reply term %d][vote granted %v]",rf.me,idx,rf.currentTerm,reqReply.Term,reqReply.VoteGranted)
 				replys=append(replys, reqReply)
 				replyMu.Unlock()
 
@@ -133,7 +133,7 @@ func (rf *Raft) startElection() {
 	}
 	wg.Wait()
 
-	//如果直接进入这段代码，存在隐患，有锁-无锁-有锁 。
+	//如果直接进入这段代码，有锁-无锁-有锁 。
 	//问题是，如果无锁的一段中raft 收到了term更高的 信息，从而变成了Follower怎么办？
 	//所以判断第三段中的身份，如果变换则废弃处理
 	rf.lock("startElection_dealing_result")
@@ -158,10 +158,10 @@ func (rf *Raft) startElection() {
 
 	if voteGathered>=len(rf.peers)/2+1 {
 		//todo: become leader
-		DPrintf("become leader, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+		DPrintf("[rf %d][become leader][term:%d]",rf.me,rf.currentTerm)
 		rf.changeRole(Leader)
 	}else {
-		DPrintf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
+		DPrintf("[rf %d][lose election][term:%d]",rf.me,rf.currentTerm)
 		rf.resetElectionTimer()
 	}
 	//DPrintf("lose election, id:%d, term:%d, time:%v",rf.me,rf.currentTerm,time.Now().Sub(rf.startTime))
@@ -203,32 +203,16 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	toleranceTimer:=time.NewTimer(RpcToleranceTimeOut*time.Millisecond)
 	//now:=time.Now()
 	defer toleranceTimer.Stop()
-	boolchan:=make(chan bool)
+	boolchan:=make(chan bool,1)
 	go func() {
 		for  {
-			select {
-			case <-rf.stopSignal:{
-				boolchan<-false
+			//当网络出错时，call可能会花费非常多的时间返回，我们这里希望在100ms之内返回，所以这里使用异步
+			ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
+			boolchan<-ok
+			if ok {
 				return
-			}
-			case <-toleranceTimer.C:{
-				boolchan<-false
-				return
-			}
-			default:
-				{
-					//当网络出错时，call可能会花费非常多的时间返回，我们这里希望在100ms之内返回，所以这里使用异步
-					ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
-					//if !ok {
-					//	time.Sleep(10 * time.Millisecond)
-					//	fmt.Printf("fail time:%v\n",time.Now().Sub(now))
-					//	continue
-					//} else {
-					//	fmt.Printf("true time:%v\n",time.Now().Sub(now))
-					//	boolchan<-true
-					//}
-					boolchan<-ok
-				}
+			}else {
+				time.Sleep(10*time.Millisecond)
 			}
 		}
 	}()
@@ -237,17 +221,18 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 		select {
 			case ok:=<-boolchan:{
 				if !ok{
-					time.Sleep(10*time.Millisecond)
+					DPrintf("[rf %d][retry send request vote][target %d]",rf.me,server)
 					continue
 				}else {
 					return true
 				}
 			}
-			case <-rf.stopSignal:
+			case <-rf.stopSignal:{
 				return false
-			case <-toleranceTimer.C:
+			}
+			case <-toleranceTimer.C: {
 				return false
-
+			}
 		}
 	}
 

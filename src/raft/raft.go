@@ -20,7 +20,6 @@ package raft
 import (
 	"../labgob"
 	"bytes"
-	"fmt"
 	"log"
 	"math/rand"
 	"sync"
@@ -64,7 +63,7 @@ const (
 	ElectionTimeout=300
 	HeartBeatTimeOut=100
 	RpcToleranceTimeOut=80
-	ApplyTimeOut=50
+	ApplyTimeOut=30
 )
 
 type Raft struct {
@@ -155,9 +154,6 @@ func (rf* Raft) lock(name string){
 
 func (rf* Raft) unlock(name string){
 	defer rf.mu.Unlock()
-	if time.Now().Sub(rf.lockTime).Milliseconds()>5 {
-		DPrintf("lock time too long: server id :%d,unlock from %s, lock time %v",rf.me,rf.lockName,time.Now().Sub(rf.lockTime))
-	}
 	rf.lockName=""
 }
 
@@ -198,7 +194,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		newLog.Command=command
 		rf.log=append(rf.log, newLog)
 		rf.persist()
-		DPrintf("start agreement: rf.id is%d,return index:%d , command is %v , time is %v", rf.me,index+1,command, time.Now().Sub(rf.startTime))
+		DPrintf("[rf %d][start agreement][return index %d][command %v]", rf.me,index+1,command)
 		//对于每一个server立即发送一条append entry 请求
 		for i:=0;i<rf.me;i++ {
 			if rf.me==i{
@@ -253,7 +249,7 @@ func (rf *Raft) getLastLogIdxAndTerm() (int, int) {
 
 
 func (rf* Raft) changeRole(role int)  {
-	DPrintf("[change role %d][from %d to %d] time:%v \n",rf.me,rf.role,role,rf.getTimeLine())
+	DPrintf("[rf %d][change role][from %d to %d] ",rf.me,rf.role,role)
 
 	// prepare for election
 	if role ==Candidate {
@@ -330,6 +326,7 @@ func (rf *Raft) applyLogs() {
 			CommandIndex: 0,
 		}
 		rf.lastApplied=rf.lastSnapshotIdx
+		//rf.commitIndex=rf.lastSnapshotIdx
 		rf.unlock("apply logs")
 		go func() {
 			rf.applyMutex.Lock()
@@ -340,12 +337,12 @@ func (rf *Raft) applyLogs() {
 	}
 
 	if rf.lastApplied>rf.commitIndex {
-		panic("apply an uncommitted index ")
+		log.Panicf("[rf %d][apply an uncommitted index][lastApplied %d][commitIndex %d]",rf.me,rf.lastApplied,rf.commitIndex)
 	}else if rf.lastApplied==rf.commitIndex{
 		rf.unlock("apply logs")
 		return
 	}else {
-		DPrintf("start applying logs, server id:%d ,from:%d , to %d, time %v",rf.me,rf.lastApplied+1,rf.commitIndex,time.Now().Sub(rf.startTime))
+		DPrintf("[rf %d][start applying logs][from %d][to %d] ",rf.me,rf.lastApplied+1,rf.commitIndex)
 		msgs:=make([]ApplyMsg,0)
 		for rf.lastApplied<rf.commitIndex  {
 			rf.lastApplied++
@@ -480,7 +477,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	//volatile properties
 	rf.commitIndex=0
 	rf.lastApplied=0
-
+	if rf.lastSnapshotIdx>0{
+		rf.commitIndex=rf.lastSnapshotIdx
+		rf.lastApplied=rf.lastSnapshotIdx
+	}
 
 	rf.electionTimer=time.NewTimer(time.Duration(me+ElectionTimeout)*time.Millisecond)
 	rf.appendEntriesTimers=make([]*time.Timer, len(peers))
@@ -543,15 +543,15 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	}()
 
 	//debug : watching lockName
-	go func() {
-		for !rf.killed() {
-			time.Sleep(time.Second*1)
-			log.Println(fmt.Sprintf("server id:%d,lock:%s, time:%v", rf.me,rf.lockName, time.Now().Sub(rf.startTime)))
-			log.Println(fmt.Sprintf("server id:%d	,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
-
-		}
-
-	}()
+	//go func() {
+	//	for !rf.killed() {
+	//		time.Sleep(time.Second*1)
+	//		log.Println(fmt.Sprintf("server id:%d,lock:%s, time:%v", rf.me,rf.lockName, time.Now().Sub(rf.startTime)))
+	//		log.Println(fmt.Sprintf("server id:%d,role: %d,term :%d ,votedFor:%d",rf.me,rf.role,rf.currentTerm,rf.voteFor))
+	//
+	//	}
+	//
+	//}()
 
 
 	return rf

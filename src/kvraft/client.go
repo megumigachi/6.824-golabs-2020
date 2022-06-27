@@ -42,8 +42,6 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck.startTime=time.Now()
 
 	// You'll have to add code here.
-
-	DPrintf("make client : id %d",ck.clientId)
 	return ck
 }
 
@@ -76,12 +74,12 @@ func (ck *Clerk) Get(key string) string {
 			Value: "",
 		}
 		leaderId:=ck.serverLeaderId
-		//DPrintf("client get , client id %d , key %v,cmd id :%v", ck.clientId,key,ck.commandId)
+		DPrintf("[client %d][get][command id %d][key %v]", ck.clientId,ck.commandId,key)
 
 		ok:=ck.servers[leaderId].Call("KVServer.Get", &args, &reply)
 		//失败重传?
 		if !ok {
-			DPrintf("failed to call server\n")
+			DPrintf("[client %d][get failed to call server][command id %d]",ck.clientId,ck.commandId)
 			//try next server
 			ck.serverLeaderId=(leaderId+1)% len(ck.servers)
 			time.Sleep(RequestIntervel)
@@ -138,7 +136,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		reply:=PutAppendReply{Err:""}
 
 		leaderId:=ck.serverLeaderId
-		//DPrintf("client put append , client id %d, op %v, key %v, value %v , commandid %v time %v", ck.clientId,op,key,value,ck.commandId,time.Now().Sub(ck.startTime))
+		DPrintf("[client %d][write][command id %d][key %v][value %v]", ck.clientId,ck.commandId,key,value)
 		ok:=ck.servers[leaderId].Call("KVServer.PutAppend", &args, &reply)
 
 		if !ok {
@@ -148,7 +146,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		}
 
 		err:=reply.Err
-		//DPrintf("client put append result , client id %d,  command id %v, result %v time %v", ck.clientId,ck.commandId,err,time.Now().Sub(ck.startTime))
+		DPrintf("[client %d][write result][command id %d][key %v][value %v]", ck.clientId,ck.commandId,key,value)
 		if err==ErrWrongLeader {
 			time.Sleep(RequestIntervel)
 			ck.serverLeaderId=(leaderId+1)%len(ck.servers)

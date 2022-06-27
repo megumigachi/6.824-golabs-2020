@@ -630,11 +630,12 @@ func TestPersistPartitionUnreliableLinearizable3A(t *testing.T) {
 // even if minority doesn't respond.
 //
 func TestSnapshotRPC3B(t *testing.T) {
+
 	const nservers = 3
 	maxraftstate := 1000
 	cfg := make_config(t, nservers, false, maxraftstate)
 	defer cfg.cleanup()
-
+	go printTimeLine()
 	ck := cfg.makeClient(cfg.All())
 
 	cfg.begin("Test: InstallSnapshot RPC (3B)")
@@ -664,10 +665,6 @@ func TestSnapshotRPC3B(t *testing.T) {
 	// lagging server, so that it has to catch up.
 
 
-	fmt.Println("print_state")
-	for i:=0;i<nservers ;i++  {
-		cfg.kvservers[i].PrintState()
-	}
 	cfg.partition([]int{0, 2}, []int{1})
 	{
 		ck1 := cfg.makeClient([]int{0, 2})
@@ -680,11 +677,6 @@ func TestSnapshotRPC3B(t *testing.T) {
 	}
 
 	// now everybody
-
-	fmt.Println("print_state_2")
-	for i:=0;i<nservers ;i++  {
-		cfg.kvservers[i].PrintState()
-	}
 	cfg.partition([]int{0, 1, 2}, []int{})
 
 
@@ -760,4 +752,13 @@ func TestSnapshotUnreliableRecoverConcurrentPartition3B(t *testing.T) {
 func TestSnapshotUnreliableRecoverConcurrentPartitionLinearizable3B(t *testing.T) {
 	// Test: unreliable net, restarts, partitions, snapshots, linearizability checks (3B) ...
 	GenericTestLinearizability(t, "3B", 15, 7, true, true, true, 1000)
+}
+
+
+func printTimeLine(){
+	start:=time.Now()
+	for  {
+		log.Printf("[now time has passed :%v]",time.Now().Sub(start))
+		time.Sleep(500*time.Millisecond)
+	}
 }

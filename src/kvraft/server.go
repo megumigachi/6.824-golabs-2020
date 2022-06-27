@@ -67,7 +67,7 @@ type KVServer struct {
 func (kv *KVServer) PrintState()  {
 	kv.lock("printstate")
 	defer kv.unlock()
-	DPrintf("[kv printState %d]",kv.me)
+	DPrintf("[kv %d][print state]",kv.me)
 	kv.PrintStateMachine()
 	kv.rf.PrintState()
 
@@ -146,11 +146,11 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		ClientId:  args.ClientId,
 		CommandId: args.CommandId,
 	}
-	DPrintf("put append command is %v server id %v time:%v",command,kv.me,time.Now().Sub(kv.startTime))
+	DPrintf("[kv %d][put append][command is %v]",kv.me,command)
 
 	//start 本身持有锁,这里应该不需要？
 	index,_,isLeader:=kv.rf.Start(command)
-	DPrintf("server : %d ,isLeader %v , time :%v ",kv.me,isLeader,time.Now().Sub(kv.startTime))
+	DPrintf("[kv %d][isLeader %v]",kv.me,isLeader)
 
 	if!isLeader{
 		reply.Err=ErrWrongLeader
@@ -193,7 +193,6 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 // to suppress debug output from a Kill()ed instance.
 //
 func (kv *KVServer) Kill() {
-	DPrintf("server killed id %d",kv.me)
 	atomic.StoreInt32(&kv.dead, 1)
 	kv.rf.Kill()
 	//close(kv.stopch)
@@ -206,7 +205,7 @@ func (kv *KVServer) killed() bool {
 }
 
 func (kv *KVServer) generateResponseChan(i int) chan ResponseMessage {
-	DPrintf("generateResponseChan  server id:%d, index:%d",kv.me,i)
+	DPrintf("[kv %d][generateResponseChan][index %d]",kv.me,i)
 	//channel需要清理，所以同一个index理当没有channel
 	if _,ok:=kv.ResponseChans[i];ok {
 		panic("error: an invalid channel ")
@@ -269,7 +268,7 @@ func (kv *KVServer) executeOperation(cmd Command) ResponseMessage{
 		panic("wrong op?")
 	}
 
-	DPrintf("execute op save result map clientId:%d , commandId: %d, response message %v",clientId,commandId,responseMsg)
+	DPrintf("[kv %d][save op to result map][clientId %d][commandId %d][response message %v]",kv.me,clientId,commandId,responseMsg)
 	kv.resultMap[clientId]=ResponseRecord{
 		CommandId: commandId,
 		Response:  responseMsg,
@@ -289,14 +288,14 @@ func (kv *KVServer) readApplych() {
 			idx:=m.CommandIndex
 			command:=m.Command
 			valid:=m.CommandValid
-			DPrintf("server id :%d , server apply message idx:%v, command:%v",kv.me,idx,command)
+			DPrintf("[kv %d][apply message][idx %v][command %v]",kv.me,idx,command)
 			if valid {
 				//apply command to state machine and then tell notify channel if possible
 				cmd:=command.(Command)
 				kv.lock("apply operation")
 				msg:=kv.executeOperation(cmd)
 				if v,ok:=kv.ResponseChans[idx];ok{
-					DPrintf("[server id :%d] notify message [idx:%d] [command:%v] [msg:%v]",kv.me,idx,command,msg)
+					DPrintf("[kv %d][notify message][idx %d][command %v][msg%v]",kv.me,idx,command,msg)
 					v<-msg
 				}else {
 					//maybe not a leader or request has been timeout
@@ -305,11 +304,11 @@ func (kv *KVServer) readApplych() {
 			}else {
 				//snapshot?
 				kv.lock("apply snapshot")
-				DPrintf("[kv apply snapshot from leader %d before]",kv.me)
+				DPrintf("[kv %d][apply snapshot from leader][before]",kv.me)
 				kv.PrintStateMachine()
 				kv.rf.PrintState()
 				kv.applySnapshot()
-				DPrintf("[kv apply snapshot from leader %d after]",kv.me)
+				DPrintf("[kv %d][apply snapshot from leader][after]",kv.me)
 				kv.PrintStateMachine()
 				kv.rf.PrintState()
 				kv.unlock()
@@ -322,7 +321,7 @@ func (kv *KVServer) readApplych() {
 }
 
 func (kv *KVServer)PrintStateMachine()  {
-	DPrintf("[kvserver :%d][statemachine %v]",kv.me,kv.StateMachine.Data)
+	DPrintf("[kv :%d][print statemachine] %v",kv.me,kv.StateMachine.Data)
 }
 
 //尝试将data写入snapshot
@@ -444,8 +443,6 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	//	}
 	//
 	//}()
-
-	DPrintf("make kv server : id %d",kv.me)
 
 
 	return kv

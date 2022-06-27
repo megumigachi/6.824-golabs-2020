@@ -67,12 +67,12 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	//prevLogidx对应的目前的idx 如果为0 ，理论上也可以，因为term=lastsnapshot
 	realPrevIdx:=rf.getLogIdxByRealIdx(prevLogidx)
 	if realPrevIdx>= len(rf.log){
-		DPrintf("dealing append entries fail1 server id:%d, log start:%d,log len:%d,success:%v,rf log len:%d,time:%v\n",rf.me,args.PrevLogIndex+1,len(args.Entries),reply.Success, len(rf.log),time.Now().Sub(rf.startTime))
+		DPrintf("[rf %d][dealing append entries fail1][log start %d][log len %d]",rf.me,args.PrevLogIndex+1,len(args.Entries))
 		reply.ConflictIndex=len(rf.log)+rf.lastSnapshotIdx
 		return
 	}
 	if rf.log[realPrevIdx].Term!=args.PrevLogTerm {
-		DPrintf("dealing append entries fail2 server id:%d, log start:%d,log len:%d,success:%v,time:%v\n",rf.me,args.PrevLogIndex+1,len(args.Entries),reply.Success,time.Now().Sub(rf.startTime))
+		DPrintf("[rf %d][dealing append entries fail2][log start %d][log len %d]",rf.me,args.PrevLogIndex+1,len(args.Entries))
 		//skip a term
 		for i:=realPrevIdx;i>=0 ;i--  {
 			if rf.log[i].Term!=rf.log[realPrevIdx].Term {
@@ -106,7 +106,8 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			rf.commitIndex=theLastEntryIdx
 		}
 	}
-	DPrintf("dealing append entries server id:%d, log start:%d,log len:%d,leaderCommit:%d,time:%v\n",rf.me,args.PrevLogIndex,len(args.Entries),args.LeaderCommit,time.Now().Sub(rf.startTime))
+	rf.applyTimer.Reset(0)
+	DPrintf("[rf %d][accept append entries][log start %d][log len %d][leaderCommit %d]",rf.me,args.PrevLogIndex,len(args.Entries),args.LeaderCommit)
 
 
 }
@@ -140,14 +141,16 @@ func (rf* Raft) appendEntriesToFollower(idx int)  {
 	prevLogidx2Realidx:=rf.getLogIdxByRealIdx(args.PrevLogIndex)
 	args.PrevLogTerm=rf.log[prevLogidx2Realidx].Term
 
-	DPrintf("leader append entries server id:%d,role:%d, term:%d ,target idx:%d,log start:%d,log length:%d,time:%v\n",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex+1,len(args.Entries),time.Now().Sub(rf.startTime))
+	DPrintf("[rf %d][leader append entries][role:%d][term:%d][target idx:%d][log start:%d][log length %d]",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex+1,len(args.Entries))
 	rf.appendEntriesTimers[idx].Reset(HeartBeatTimeOut*time.Millisecond)
 	rf.unlock("appendEntries")
 
-	boolchan:=make(chan bool)
+	//这里使用带有缓冲的channel可以防止goroutine泄漏
+	//不然会报出如这样：goroutine 570 [chan send],一分钟报六百多个
+	//原因是对等的接收程序已经退出，这边还在傻傻地等待接收人出现才能发送
+	boolchan:=make(chan bool,1)
 
 	go func() {
-
 		//与选举同样，这里改为异步，否则服务器将无法响应rpc?(明明没有加锁，为什么?)
 		ok:=rf.peers[idx].Call("Raft.AppendEntries", args, reply)
 		boolchan<-ok
@@ -174,13 +177,13 @@ func (rf* Raft) appendEntriesToFollower(idx int)  {
 					success:=reply.Success
 					if !success {
 						if term>rf.currentTerm {
-							DPrintf("term less than target,turn to follower\n")
+							DPrintf("[rf %d]term less than target,turn to follower",rf.me)
 							rf.currentTerm=term
 							rf.persist()
 							rf.changeRole(Follower)
 						}else {
 							//target server refuse logs, reduce log idx
-							DPrintf("target server refuse logs,target id:%d,reply term:%d,\n",idx,reply.Term)
+							DPrintf("[rf %d][target server refuse logs][target id:%d][reply term:%d]",rf.me,idx,reply.Term)
 							conTerm:=reply.ConflictTerm
 							if conTerm==-1 {
 								rf.nextIndex[idx]=reply.ConflictIndex
@@ -206,7 +209,7 @@ func (rf* Raft) appendEntriesToFollower(idx int)  {
 						rf.updateCommitIndex()
 					}
 				}else {
-					DPrintf("append entries network failed, server id :%d, time: %v",rf.me, time.Now().Sub(rf.startTime))
+					//DPrintf("append entries network failed, server id :%d, time: %v",rf.me, time.Now().Sub(rf.startTime))
 					rf.appendEntriesTimers[idx].Reset(10*time.Millisecond)
 				}
 				return
@@ -235,5 +238,6 @@ func (rf *Raft) updateCommitIndex() {
 	median:=temp[(len(rf.peers)-1)/2]
 	if median>rf.commitIndex&& rf.log[rf.getLogIdxByRealIdx(median)].Term==rf.currentTerm{
 		rf.commitIndex=median
+		rf.applyTimer.Reset(0)
 	}
 }
