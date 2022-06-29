@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"log"
 	"time"
 )
 
@@ -95,8 +94,8 @@ func (rf *Raft) sendSnapshot (idx int) {
 				}else {
 					DPrintf("[rf %d][install snapshot success][target id %d]",rf.me,idx)
 					//默认更新成功
-					rf.nextIndex[idx]=rf.lastSnapshotIdx+1
-					rf.matchedIndex[idx]=rf.lastSnapshotIdx
+					rf.nextIndex[idx]=args.LastIncludedIdx+1
+					rf.matchedIndex[idx]=args.LastIncludedIdx
 					rf.updateCommitIndex()
 				}
 			}else {
@@ -113,28 +112,39 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	/*什么情况会出现 arg.index<server.lastindex
 	此时 leader 的next< arg.index< server
 	感觉怎么都举不出例子造成这种情况
-	所以先设置一个panic在这里*/
+	非可信网络下一切皆有可能,比如leader append entry传了一堆数据，回传的确认数据没有收到
+	然后此时server进行了一轮快照，leader没有，leader 按照上次没有更新的nextIndex[server]
+	来为server发送快照，就会出现一个更早的快照。
+	那该怎么处理呢？首先不能应用，状态机和是绝对不可能回退的，否则违背了一致性。只能丢弃
+	但是install snapshot rpc是没有success的，这会造成什么后果？
+	实际上leader会把matched index 和next index都调整到该snapshotindex的位置，虽然小于实际上应该的
+	matched index，但不会造成逻辑上的错误
+	*/
 	rf.lock("install_snapshot")
 	defer rf.unlock("install_snapshot")
 
 	leaderId:=args.LeaderId
-	DPrintf("[rf %d][receive install snapshot][from %d][lastidx %d][received Data len %d]",rf.me,leaderId,args.LastIncludedIdx,len(args.Data))
 
 
 	reply.Term=rf.currentTerm
 
 	if args.Term<rf.currentTerm {
 		return
+	}else if args.Term>rf.currentTerm{
+		rf.currentTerm=args.Term
+		rf.persist()
+		rf.changeRole(Follower)
+		reply.Term=rf.currentTerm
 	}
 
-	if args.LastIncludedIdx<rf.lastSnapshotIdx {
-		log.Panicf("[install snapshot %d][args.index<lastSnapshotIndex]",rf.me)
+	//if args.LastIncludedIdx<rf.lastSnapshotIdx {
+	//	log.Panicf("[install snapshot %d][args.index<lastSnapshotIndex]",rf.me)
+	//	return
+	//}
+	if args.LastIncludedIdx<=rf.lastSnapshotIdx {
 		return
 	}
-	if args.LastIncludedIdx==rf.lastSnapshotIdx {
-		//大概是超时重发？
-		return
-	}
+	DPrintf("[rf %d][accept install snapshot][from %d][lastidx %d][received Data len %d]",rf.me,leaderId,args.LastIncludedIdx,len(args.Data))
 
 	rf.resetElectionTimer()
 	beginIdx:=rf.getLogIdxByRealIdx(args.LastIncludedIdx)
@@ -152,7 +162,9 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	}
 	rf.lastSnapshotIdx=args.LastIncludedIdx
 	rf.lastSnapshotTerm=args.LastIncludedTerm
-	rf.commitIndex=rf.lastSnapshotIdx
+	if rf.commitIndex<rf.lastSnapshotIdx {
+		rf.commitIndex=rf.lastSnapshotIdx
+	}
 	rf.persister.SaveStateAndSnapshot(rf.generatePersistData(),args.Data)
 	rf.applyTimer.Reset(0)
 }

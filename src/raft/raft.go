@@ -199,7 +199,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		rf.persist()
 		DPrintf("[rf %d][start agreement][return index %d][command %v][time %v]", rf.me,index+1,command,time.Now().Sub(rf.startTime))
 		//对于每一个server立即发送一条append entry 请求
-		for i:=0;i<rf.me;i++ {
+		for i:=0;i< len(rf.peers);i++ {
 			if rf.me==i{
 				continue
 			}

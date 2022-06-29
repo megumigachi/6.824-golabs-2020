@@ -75,7 +75,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 
 func (rf *Raft) resetElectionTimer() {
-	DPrintf("[rf %d][reset election timer]",rf.me)
+	//DPrintf("[rf %d][reset election timer]",rf.me)
 	rf.electionTimer.Stop();
 	rf.electionTimer.Reset(rf.generateRandomElectionTimeOut())
 }

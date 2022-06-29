@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"log"
 	"sort"
 	"time"
 )
@@ -34,7 +35,11 @@ func (rf *Raft) getAppendLogs(idx int) []Log {
 	if idx==rf.me {
 		panic("can't append log to self")
 	}
+	//nextindex[idx]>lastsnapshot+log.len?
 	nid:=rf.getLogIdxByRealIdx(rf.nextIndex[idx])
+	if nid> len(rf.log) {
+		log.Panicf("[rf %d][getAppendLogsErr %d][nid %d > log len %d][last snapshot idx %d]",rf.me,idx,nid, len(rf.log),rf.lastSnapshotIdx)
+	}
 	return rf.log[nid:]
 }
 
@@ -65,6 +70,14 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	//condition2
 	prevLogidx:=args.PrevLogIndex
 	//prevLogidx对应的目前的idx 如果为0 ，理论上也可以，因为term=lastsnapshot
+	if prevLogidx<rf.lastSnapshotIdx {
+		//在非可信网络条件下，可能出现请求乱序重发等问题，比如可能install snapshot之后
+		//之前的append entry 又发了过来，就导致了这样的一个问题
+		reply.ConflictTerm=-1
+		reply.ConflictIndex=rf.lastSnapshotIdx+1
+		DPrintf("[rf %d][dealing append entries prev<lastsnapshot][prev %d][lastsnapshot %d]",rf.me,args.PrevLogIndex+1,rf.lastSnapshotIdx)
+		return
+	}
 	realPrevIdx:=rf.getLogIdxByRealIdx(prevLogidx)
 	if realPrevIdx>= len(rf.log){
 		DPrintf("[rf %d][dealing append entries fail1][log start %d][log len %d]",rf.me,args.PrevLogIndex+1,len(args.Entries))
@@ -121,7 +134,7 @@ func (rf* Raft) appendEntriesToFollower(idx int)  {
 	}
 
 	//nextIndex[idx] <=lastSnapshotIdx => use snapshot instead of entries
-	//注意這裡的等號
+	//注意這裡的等号
 	if rf.nextIndex[idx]<=rf.lastSnapshotIdx {
 		go rf.sendSnapshot(idx)
 		rf.unlock("appendEntries")
@@ -141,7 +154,7 @@ func (rf* Raft) appendEntriesToFollower(idx int)  {
 	prevLogidx2Realidx:=rf.getLogIdxByRealIdx(args.PrevLogIndex)
 	args.PrevLogTerm=rf.log[prevLogidx2Realidx].Term
 
-	DPrintf("[rf %d][leader append entries][role:%d][term:%d][target idx:%d][log start:%d][log length %d][time %v]",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex+1,len(args.Entries),rf.getTimeLine())
+	DPrintf("[rf %d][leader append entries][role:%d][term:%d][target id:%d][log start:%d][log length %d][time %v]",rf.me,rf.role,rf.currentTerm,idx,args.PrevLogIndex+1,len(args.Entries),rf.getTimeLine())
 	rf.appendEntriesTimers[idx].Reset(HeartBeatTimeOut*time.Millisecond)
 	rf.unlock("appendEntries")
 
@@ -183,21 +196,24 @@ func (rf* Raft) appendEntriesToFollower(idx int)  {
 							rf.changeRole(Follower)
 						}else {
 							//target server refuse logs, reduce log idx
-							DPrintf("[rf %d][target server refuse logs][target id:%d][reply term:%d]",rf.me,idx,reply.Term)
+							DPrintf("[rf %d][target server refuse logs][target id %d][reply term:%d]",rf.me,idx,reply.Term)
 							conTerm:=reply.ConflictTerm
 							if conTerm==-1 {
+								DPrintf("[rf %d][set next index 1][target id %d][set nextIndex to %d]",rf.me,idx,reply.ConflictIndex)
 								rf.nextIndex[idx]=reply.ConflictIndex
 							}else {
 								find:=false
 								for i:=args.PrevLogIndex-rf.lastSnapshotIdx;i>=0 ;i--  {
 									if rf.log[i].Term==conTerm {
 										rf.nextIndex[idx]=i+1+rf.lastSnapshotIdx
+										DPrintf("[rf %d][set next index 2][target id %d][set nextIndex to %d]",rf.me,idx,rf.nextIndex[idx])
 										find=true
 										break
 									}
 								}
 								if !find {
 									rf.nextIndex[idx]=reply.ConflictIndex
+									DPrintf("[rf %d][set next index 3][target id %d][set nextIndex to %d]",rf.me,idx,rf.nextIndex[idx])
 								}
 							}
 							rf.appendEntriesTimers[idx].Reset(0)
